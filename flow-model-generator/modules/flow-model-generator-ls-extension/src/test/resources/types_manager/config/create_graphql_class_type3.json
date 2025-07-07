@@ -49,43 +49,24 @@
       }
     },
     "members": [],
+    "includes": [],
     "functions": [
       {
         "accessor": "get",
         "qualifiers": [],
         "parameters": [],
         "kind": "RESOURCE",
-        "name": "dob",
-        "returnType": "time:Utc",
-        "refs": [
-          "ballerina/time:Utc"
-        ],
-        "imports": {
-          "Utc": "ballerina/time:2.9.0",
-          "xml": "ballerina/xml:2.8.0"
-        }
+        "name": "age",
+        "returnType": "int",
+        "refs": []
       }
-    ],
-    "includes": []
+    ]
   },
   "output": {
     "test_pack3/graphql_types.bal": [
       {
         "range": {
           "start": {
-            "line": 1,
-            "character": 0
-          },
-          "end": {
-            "line": 1,
-            "character": 0
-          }
-        },
-        "newText": "\nimport ballerina/time;\n\n\nimport ballerina/xml;\n"
-      },
-      {
-        "range": {
-          "start": {
             "line": 38,
             "character": 1
           },
@@ -94,7 +75,7 @@
             "character": 1
           }
         },
-        "newText": "\nservice class Person {\n\ttime:Utc dob;\n\tfunction init(time:Utc dob) {\n\t\tself.dob = dob;\n\t}\n\tresource function get dob() returns time:Utc {\n\t\treturn self.dob;\n\t}\n}"
+        "newText": "\nservice class Person {\n\tint age;\n\tfunction init(int age) {\n\t\tself.age = age;\n\t}\n\tresource function get age() returns int {\n\t\treturn self.age;\n\t}\n}"
       }
     ]
   }
