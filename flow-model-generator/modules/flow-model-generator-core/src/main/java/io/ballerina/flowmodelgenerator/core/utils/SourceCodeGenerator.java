@@ -60,6 +60,52 @@ public class SourceCodeGenerator {
         }
 
         StringBuilder fieldBuilder = new StringBuilder();
+        StringBuilder initParams = new StringBuilder();
+        StringBuilder initBody = new StringBuilder();
+        StringBuilder resourceFunctions = new StringBuilder();
+
+        // Analyze and generate inferred fields from functions
+        if (typeData.functions() != null && !typeData.functions().isEmpty()) {
+            for (int i = 0; i < typeData.functions().size(); i++) {
+                Function function = typeData.functions().get(i);
+                String type = generateTypeDescriptor(function.returnType());
+                String name = CommonUtil.escapeReservedKeyword(function.name());
+
+                // Add imports for the function
+                if (Objects.nonNull(function.imports())) {
+                    function.imports().forEach(this.imports::putIfAbsent);
+                }
+
+                // Generate the init parameters
+                initParams.append(type).append(" ").append(name);
+                if (i < typeData.functions().size() - 1) {
+                    initParams.append(", ");
+                }
+
+                // Generate the init body
+                initBody
+                        .append(LS)
+                        .append("\t\tself.")
+                        .append(name)
+                        .append(" = ")
+                        .append(name)
+                        .append(";");
+
+                // Generate the fields
+                fieldBuilder
+                        .append(LS)
+                        .append("\t")
+                        .append(type)
+                        .append(" ")
+                        .append(name)
+                        .append(";");
+
+                // Build the resource functions.
+                resourceFunctions.append(generateResourceFunction(function, true));
+            }
+        }
+
+        // Generate the fields from the members.
         for (Member member: typeData.members()) {
             fieldBuilder
                     .append(generateDocs(member.docs(), "\t"))
@@ -67,19 +113,18 @@ public class SourceCodeGenerator {
                     .append(";");
         }
 
-        // Build the resource functions.
-        StringBuilder resourceFunctions = new StringBuilder();
-        if (typeData.functions() != null) {
-            for (Function function : typeData.functions()) {
-                resourceFunctions.append(generateResourceFunction(function));
-            }
-        }
-
-        String template = "%nservice class %s {%s%n\tfunction init() {%n\t}%s%n}";
+        String template = "%nservice class %s {" +
+                "%s" +
+                "%n\tfunction init(%s) {" +
+                "%s" +
+                "%n\t}" +
+                "%s%n}";
 
         return template.formatted(
                 typeData.name(),
                 fieldBuilder.toString(),
+                initParams.toString(),
+                initBody.toString(),
                 resourceFunctions.toString()
         );
     }
@@ -395,7 +440,7 @@ public class SourceCodeGenerator {
                         " = " + member.defaultValue() : "");
     }
 
-    private String generateResourceFunction(Function function) {
+    private String generateResourceFunction(Function function, boolean withInferredReturnStatement) {
         // Add the imports
         if (Objects.nonNull(function.imports())) {
             function.imports().forEach(this.imports::putIfAbsent);
@@ -410,13 +455,13 @@ public class SourceCodeGenerator {
         }
 
         String template = "%s\tresource function %s %s(%s) returns %s {" +
-                "%n\t\tdo {" +
-                "%n\t\t\tpanic error(\"Unimplemented function\");" +
-                "%n\t\t} on fail error err {" +
-                "%n\t\t\t//handle error" +
-                "%n\t\t\tpanic error(\"Unhandled error\");" +
-                "%n\t\t}" +
+                "%s" +
                 "%n\t}";
+
+        String returnStmt = "";
+        if (withInferredReturnStatement) {
+            returnStmt = LS + "\t\treturn self." + function.name() + ";";
+        }
 
         return template.formatted(
                 docs,
@@ -424,7 +469,7 @@ public class SourceCodeGenerator {
                 function.name(),
                 paramJoiner.toString(),
                 generateTypeDescriptor(function.returnType()),
-                function.name()
+                returnStmt
         );
     }
 
