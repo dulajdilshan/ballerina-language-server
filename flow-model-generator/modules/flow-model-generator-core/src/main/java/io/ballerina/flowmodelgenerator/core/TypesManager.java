@@ -56,6 +56,7 @@ import io.ballerina.modelgenerator.commons.CommonUtils;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
+import io.ballerina.projects.Package;
 import io.ballerina.tools.text.LinePosition;
 import io.ballerina.tools.text.LineRange;
 import org.ballerinalang.langserver.common.utils.CommonUtil;
@@ -92,7 +93,18 @@ public class TypesManager {
         this.module = typeDocument.module();
     }
 
-    public JsonElement getAllTypes(SemanticModel semanticModel) {
+    public JsonElement getAllTypes(Package currentPackage) {
+        List<Object> allTypes = new ArrayList<>();
+
+        currentPackage.modules().forEach(m -> {
+            SemanticModel sm = m.getCompilation().getSemanticModel();
+            allTypes.addAll(getAllTypesInAModule(sm));
+        });
+
+        return gson.toJsonTree(allTypes);
+    }
+
+    private List<Object> getAllTypesInAModule(SemanticModel semanticModel) {
         Map<String, Symbol> symbolMap = semanticModel.moduleSymbols().stream()
                 .filter(s -> supportedSymbolKinds.contains(s.kind()))
                 .collect(Collectors.toMap(symbol -> symbol.getName().orElse(""), symbol -> symbol));
@@ -108,9 +120,7 @@ public class TypesManager {
             addMemberTypes(typeSymbol, symbolMap);
         });
 
-        List<Object> allTypes = symbolMap.values().stream().map(this::getTypeData).toList();
-
-        return gson.toJsonTree(allTypes);
+        return symbolMap.values().stream().map(this::getTypeData).toList();
     }
 
     public JsonElement getGraphqlType(SemanticModel semanticModel, Document document, LinePosition linePosition) {
@@ -531,7 +541,8 @@ public class TypesManager {
                 codedata.id(),
                 codedata.isNew(),
                 codedata.isGenerated(),
-                codedata.inferredReturnType()
+                codedata.inferredReturnType(),
+                codedata.filePath()
         );
     }
 

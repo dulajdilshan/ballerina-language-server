@@ -51,6 +51,7 @@ import io.ballerina.flowmodelgenerator.extension.response.TypeUpdateResponse;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.modelgenerator.commons.PackageUtil;
 import io.ballerina.projects.Document;
+import io.ballerina.projects.Project;
 import org.ballerinalang.annotation.JavaSPIService;
 import org.ballerinalang.diagramutil.connector.models.connector.Type;
 import org.ballerinalang.langserver.commons.service.spi.ExtendedLanguageServerService;
@@ -104,12 +105,12 @@ public class TypesManagerService implements ExtendedLanguageServerService {
                 Path filePath = Path.of(request.filePath());
                 this.workspaceManager.loadProject(filePath);
                 Optional<Document> document = this.workspaceManager.document(filePath);
-                Optional<SemanticModel> semanticModel = this.workspaceManager.semanticModel(filePath);
-                if (document.isEmpty() || semanticModel.isEmpty()) {
+                Optional<Project> project = this.workspaceManager.project(filePath);
+                if (project.isEmpty() || document.isEmpty()) {
                     return response;
                 }
                 TypesManager typesManager = new TypesManager(document.get());
-                JsonElement allTypes = typesManager.getAllTypes(semanticModel.get());
+                JsonElement allTypes = typesManager.getAllTypes(project.get().currentPackage());
                 response.setTypes(allTypes);
             } catch (Throwable e) {
                 throw new RuntimeException(e);
