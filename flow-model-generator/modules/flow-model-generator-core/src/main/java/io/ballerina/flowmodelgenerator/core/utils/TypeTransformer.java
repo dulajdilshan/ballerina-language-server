@@ -62,6 +62,7 @@ import io.ballerina.modelgenerator.commons.CommonUtils;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Module;
+import io.ballerina.tools.text.LineRange;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -97,7 +98,8 @@ public class TypeTransformer {
                     .stepOut()
                 .codedata()
                     .node(NodeKind.SERVICE_DECLARATION)
-                    .lineRange(serviceDeclarationSymbol.getLocation().get().lineRange())
+                    .lineRange(getLineRangeWithRelativeFilePathAsFileName(serviceDeclarationSymbol))
+                    .filePath(getLineRangeWithRelativeFilePathAsFileName(serviceDeclarationSymbol).fileName())
                     .stepOut()
                 .properties()
                     .name(attachPoint, false, false, false)
@@ -138,7 +140,8 @@ public class TypeTransformer {
                     .stepOut()
                 .codedata()
                     .node(NodeKind.CLASS)
-                    .lineRange(classSymbol.getLocation().get().lineRange())
+                    .lineRange(getLineRangeWithRelativeFilePathAsFileName(classSymbol))
+                    .filePath(getLineRangeWithRelativeFilePathAsFileName(classSymbol).fileName())
                     .stepOut()
                 .properties()
                     .name(typeName, false, false, false)
@@ -210,13 +213,15 @@ public class TypeTransformer {
     public Object transform(TypeDefinitionSymbol typeDef) {
         TypeData.TypeDataBuilder typeDataBuilder = new TypeData.TypeDataBuilder();
         String typeName = getTypeName(typeDef);
+
         typeDataBuilder
                 .name(typeName)
                 .metadata()
                     .label(typeName)
                     .stepOut()
                 .codedata()
-                    .lineRange(typeDef.getLocation().get().lineRange())
+                    .lineRange(getLineRangeWithRelativeFilePathAsFileName(typeDef))
+                    .filePath(getLineRangeWithRelativeFilePathAsFileName(typeDef).fileName())
                     .stepOut()
                 .properties()
                     .name(typeName, false, false, false)
@@ -253,7 +258,8 @@ public class TypeTransformer {
                     .stepOut()
                 .codedata()
                     .node(NodeKind.ENUM)
-                    .lineRange(enumSymbol.getLocation().get().lineRange())
+                    .lineRange(getLineRangeWithRelativeFilePathAsFileName(enumSymbol))
+                    .filePath(getLineRangeWithRelativeFilePathAsFileName(enumSymbol).fileName())
                     .stepOut()
                 .properties()
                     .name(typeName, false, false, false)
@@ -729,5 +735,18 @@ public class TypeTransformer {
         // If a non-readonly type is found, we treat it as a first-class non-intersection type with readonly flag on
         typeDataBuilder.properties().isReadOnly(true, true, true, false);
         return transform(nonReadonlyTypeSymbol, typeDataBuilder);
+    }
+
+    // TODO:
+    //  This is a temporary method to resolve the line range with relative file path as file name.
+    //  Resolve this properly using `codedata.filePath` and remove this method with the usages.
+    private LineRange getLineRangeWithRelativeFilePathAsFileName(Symbol symbol) {
+        LineRange lineRange = symbol.getLocation().get().lineRange();
+        if (CommonUtils.isWithinPackage(symbol, moduleInfo)) {
+            String modulePrefix = symbol.getModule().get().id().modulePrefix();
+            String fileName = "modules/%s/%s".formatted(modulePrefix, lineRange.fileName());
+            return LineRange.from(fileName, lineRange.startLine(), lineRange.endLine());
+        }
+        return lineRange;
     }
 }

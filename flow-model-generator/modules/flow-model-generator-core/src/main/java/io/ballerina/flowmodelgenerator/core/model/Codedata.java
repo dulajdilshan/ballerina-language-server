@@ -39,12 +39,13 @@ import io.ballerina.tools.text.LineRange;
  * @param isNew              Whether the component is a node template
  * @param isGenerated        The component is auto generated or not
  * @param inferredReturnType The inferred return type of the component if exists
+ * @param filePath           The file path of the component
  * @since 1.0.0
  */
 public record Codedata(NodeKind node, String org, String module, String packageName, String object, String symbol,
                        String version, LineRange lineRange, String sourceCode, String parentSymbol,
                        String resourcePath, Integer id, Boolean isNew, Boolean isGenerated,
-                       String inferredReturnType) {
+                       String inferredReturnType, String filePath) {
 
     @Override
     public String toString() {
@@ -88,6 +89,7 @@ public record Codedata(NodeKind node, String org, String module, String packageN
         private Boolean isNew;
         private Boolean isGenerated;
         private String inferredReturnType;
+        private String filePath;
 
         public Builder(T parentBuilder) {
             super(parentBuilder);
@@ -139,6 +141,11 @@ public record Codedata(NodeKind node, String org, String module, String packageN
             return this;
         }
 
+        public Builder<T> filePath(String filePath) {
+            this.filePath = filePath;
+            return this;
+        }
+
         public Builder<T> sourceCode(String sourceCode) {
             this.sourceCode = sourceCode;
             return this;
@@ -181,7 +188,7 @@ public record Codedata(NodeKind node, String org, String module, String packageN
 
         public Codedata build() {
             return new Codedata(node, org, module, packageName, object, symbol, version, lineRange, sourceCode,
-                    parentSymbol, resourcePath, id, isNew, isGenerated, inferredReturnType);
+                    parentSymbol, resourcePath, id, isNew, isGenerated, inferredReturnType, filePath);
         }
     }
 }
