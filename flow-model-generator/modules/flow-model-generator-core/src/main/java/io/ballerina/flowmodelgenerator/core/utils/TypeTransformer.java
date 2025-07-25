@@ -257,6 +257,7 @@ public class TypeTransformer {
                     .stepOut()
                 .properties()
                     .name(typeName, false, false, false)
+                    .isPublic(enumSymbol.qualifiers().contains(Qualifier.PUBLIC), true, true, false)
                     .isArray("false", true, true, true)
                     .arraySize("", false, false, false);
 

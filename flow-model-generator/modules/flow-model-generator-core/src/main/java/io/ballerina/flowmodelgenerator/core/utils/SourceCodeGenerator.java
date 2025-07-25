@@ -75,9 +75,10 @@ public class SourceCodeGenerator {
             }
         }
 
-        String template = "%n%sservice class %s {%s%n\tfunction init() {%n\t}%s%n}";
+        String template = "%n%%ssservice class %s {%s%n\tfunction init() {%n\t}%s%n}";
 
         return template.formatted(
+                isPublicFlagOn(typeData.properties()) ? "public " : "",
                 isReadonlyFlagOn(typeData.properties()) ? "readonly " : "",
                 typeData.name(),
                 fieldBuilder.toString(),
@@ -105,9 +106,14 @@ public class SourceCodeGenerator {
             }
         }
 
-        String template = "%senum %s {%s%n}%n";
+        String template = "%s%senum %s {%s%n}%n";
 
-        return template.formatted(docs, typeData.name(), enumValues.toString());
+        return template.formatted(
+                docs,
+                isPublicFlagOn(typeData.properties()) ? "public " : "",
+                typeData.name(),
+                enumValues.toString()
+        );
     }
 
     private String generateTypeDefCodeSnippet(TypeData typeData) {
@@ -115,6 +121,7 @@ public class SourceCodeGenerator {
         if (typeData.metadata() != null && typeData.metadata().description() != null) {
             docs = generateDocs(typeData.metadata().description(), "");
         }
+
         String typeDescriptor = generateTypeDescriptor(typeData);
 
         // Check for readonly property to generate `readonly & <type-desc>` type
@@ -126,9 +133,14 @@ public class SourceCodeGenerator {
             }
         }
 
-        String template = "%stype %s %s;";
+        String template = "%s%stype %s %s;";
 
-        return template.formatted(docs, typeData.name(), typeDescriptor);
+        return template.formatted(
+                docs,
+                isPublicFlagOn(typeData.properties()) ? "public " : "",
+                typeData.name(),
+                typeDescriptor
+        );
     }
 
     private String generateTypeDescriptor(Object typeDescriptor) {
@@ -457,5 +469,10 @@ public class SourceCodeGenerator {
     private boolean isReadonlyFlagOn(Map<String, Property> properties) {
         Property readonlyProperty = properties.get(Property.IS_READ_ONLY_KEY);
         return readonlyProperty != null && readonlyProperty.value().equals("true");
+    }
+
+    private boolean isPublicFlagOn(Map<String, Property> properties) {
+        Property publicProperty = properties.get(Property.IS_PUBLIC_KEY);
+        return publicProperty != null && publicProperty.value().equals("true");
     }
 }
