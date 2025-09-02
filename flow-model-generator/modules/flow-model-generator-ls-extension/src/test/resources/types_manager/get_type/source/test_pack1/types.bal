@@ -159,3 +159,12 @@ type EngineeringStudent record {|
 	decimal universityCode;
 	int year;
 |};
+
+type Rec1 record {|
+  int|decimal id;
+|};
+
+type Rec2 record {|
+  *Rec1;
+  int|decimal id;
+|};
