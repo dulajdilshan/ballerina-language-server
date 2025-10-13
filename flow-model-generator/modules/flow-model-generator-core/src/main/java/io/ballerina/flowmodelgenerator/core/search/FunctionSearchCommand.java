@@ -86,9 +86,10 @@ class FunctionSearchCommand extends SearchCommand {
     private static final String FETCH_KEY = "functions";
     private final List<String> moduleNames;
     private final Document functionsDoc;
+    private final Document dataMappingsDoc;
 
     public FunctionSearchCommand(Project project, LineRange position, Map<String, String> queryMap,
-                                 Document functionsDoc) {
+                                 Document functionsDoc, Document dataMappingsDoc) {
         super(project, position, queryMap);
 
         // Obtain the imported module names
@@ -98,6 +99,7 @@ class FunctionSearchCommand extends SearchCommand {
                 .map(moduleDependency -> moduleDependency.descriptor().name().packageName().value())
                 .toList();
         this.functionsDoc = functionsDoc;
+        this.dataMappingsDoc = dataMappingsDoc;
         // TODO: Use this method when https://github.com/ballerina-platform/ballerina-lang/issues/43695 is fixed
         // List<String> moduleNames = semanticModel.moduleSymbols().stream()
         // .filter(symbol -> symbol.kind().equals(SymbolKind.MODULE))
@@ -195,17 +197,26 @@ class FunctionSearchCommand extends SearchCommand {
         List<Item> availableTools = new ArrayList<>();
         for (Symbol symbol : functionSymbols) {
             FunctionSymbol functionSymbol = (FunctionSymbol) symbol;
+            // Skip NP functions from functions.bal
             if (functionsDoc != null
                     && CommonUtils.isNaturalExpressionBodiedFunction(functionsDoc.syntaxTree(), functionSymbol)) {
-                // Skip NP functions
+                continue;
+            }
+            // Skip NP functions from data_mappings.bal
+            if (dataMappingsDoc != null
+                    && CommonUtils.isNaturalExpressionBodiedFunction(dataMappingsDoc.syntaxTree(), functionSymbol)) {
                 continue;
             }
 
             boolean isDataMappedFunction = false;
             Optional<Location> location = symbol.getLocation();
             if (location.isPresent()) {
-                isDataMappedFunction = location.get().lineRange().fileName().equals(DATA_MAPPER_FILE_NAME);
                 LineRange fnLineRange = location.get().lineRange();
+                // Check if function is in data_mappings.bal and is a data mapping function
+                if (fnLineRange.fileName().equals(DATA_MAPPER_FILE_NAME) && dataMappingsDoc != null) {
+                    isDataMappedFunction = CommonUtils.isDataMappingFunction(
+                            dataMappingsDoc.syntaxTree(), functionSymbol);
+                }
                 if (fnLineRange.fileName().equals(position.fileName()) &&
                         PositionUtil.isWithinLineRange(fnLineRange, position)) {
                     continue;
