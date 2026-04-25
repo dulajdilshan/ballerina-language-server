@@ -46,3 +46,6 @@ build/
 
 # macOS metadata files
 .DS_Store
+
+# coding agent files
+.claude
