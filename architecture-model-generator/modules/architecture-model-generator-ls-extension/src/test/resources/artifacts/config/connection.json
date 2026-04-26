@@ -40,7 +40,7 @@
         "type": "CONNECTION",
         "name": "httpConnection",
         "scope": "Global",
-        "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png",
+        "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png",
         "module": "http",
         "children": {}
       },
@@ -80,7 +80,7 @@
         "type": "CONNECTION",
         "name": "tcpConnection",
         "scope": "Global",
-        "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_tcp_1.13.2.png",
+        "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_tcp_1.13.3.png",
         "module": "tcp",
         "children": {}
       }

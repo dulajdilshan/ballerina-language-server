@@ -5,6 +5,26 @@
   "output": {
     "Connections": {
       "additions": {
+        "_telegramAgentAgent": {
+          "id": "_telegramAgentAgent",
+          "location": {
+            "fileName": "agents.bal",
+            "startLine": {
+              "line": 3,
+              "offset": 0
+            },
+            "endLine": {
+              "line": 6,
+              "offset": 44
+            }
+          },
+          "type": "CONNECTION",
+          "name": "_telegramAgentAgent",
+          "scope": "Global",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerinax_ai.agent_0.9.2.png",
+          "module": "ai.agent",
+          "children": {}
+        },
         "httpEp": {
           "id": "httpEp",
           "location": {
@@ -21,48 +41,8 @@
           "type": "CONNECTION",
           "name": "httpEp",
           "scope": "Global",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png",
           "module": "http",
-          "children": {}
-        }
-      }
-    },
-    "Variables": {
-      "additions": {
-        "_telegramAgentAgent": {
-          "id": "_telegramAgentAgent",
-          "location": {
-            "fileName": "agents.bal",
-            "startLine": {
-              "line": 3,
-              "offset": 0
-            },
-            "endLine": {
-              "line": 6,
-              "offset": 44
-            }
-          },
-          "type": "VARIABLE",
-          "name": "_telegramAgentAgent",
-          "scope": "Global",
-          "children": {}
-        },
-        "menuItems": {
-          "id": "menuItems",
-          "location": {
-            "fileName": "main.bal",
-            "startLine": {
-              "line": 7,
-              "offset": 0
-            },
-            "endLine": {
-              "line": 11,
-              "offset": 2
-            }
-          },
-          "type": "VARIABLE",
-          "name": "menuItems",
-          "scope": "Global",
           "children": {}
         },
         "_telegramAgentModel": {
@@ -78,8 +58,32 @@
               "offset": 87
             }
           },
-          "type": "VARIABLE",
+          "type": "CONNECTION",
           "name": "_telegramAgentModel",
+          "scope": "Global",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerinax_ai.agent_0.9.2.png",
+          "module": "ai.agent",
+          "children": {}
+        }
+      }
+    },
+    "Variables": {
+      "additions": {
+        "menuItems": {
+          "id": "menuItems",
+          "location": {
+            "fileName": "main.bal",
+            "startLine": {
+              "line": 7,
+              "offset": 0
+            },
+            "endLine": {
+              "line": 11,
+              "offset": 2
+            }
+          },
+          "type": "VARIABLE",
+          "name": "menuItems",
           "scope": "Global",
           "children": {}
         },
@@ -215,6 +219,8 @@
           "type": "LISTENER",
           "name": "telegramAgentListener",
           "scope": "Global",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerinax_ai.agent_0.9.2.png",
+          "module": "ai.agent",
           "children": {}
         },
         "httpListener": {
@@ -233,7 +239,7 @@
           "type": "LISTENER",
           "name": "httpListener",
           "scope": "Global",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png",
           "module": "http",
           "children": {}
         }
@@ -499,6 +505,8 @@
           "type": "SERVICE",
           "name": "/telegramAgent",
           "scope": "Global",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerinax_ai.agent_0.9.2.png",
+          "module": "ai.agent",
           "children": {
             "post#chat": {
               "id": "post#chat",
@@ -537,7 +545,7 @@
           "type": "SERVICE",
           "name": "HTTP Service - /restaurant",
           "scope": "Global",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png",
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png",
           "module": "http",
           "children": {
             "get#menu": {
