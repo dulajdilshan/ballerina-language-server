@@ -165,127 +165,6 @@
       "items": [
         {
           "metadata": {
-            "label": "data.jsondata",
-            "description": "",
-            "keywords": []
-          },
-          "items": [
-            {
-              "metadata": {
-                "label": "parseAsType",
-                "description": "Convert value of type `json` to subtype of `anydata`.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "parseAsType",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "parseString",
-                "description": "Converts JSON string to subtype of anydata.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "parseString",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "parseBytes",
-                "description": "Converts JSON byte[] to subtype of anydata.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "parseBytes",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "parseStream",
-                "description": "Converts JSON byte-block-stream to subtype of anydata.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "parseStream",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "toJson",
-                "description": "Converts a value of type `anydata` to `json`.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "toJson",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "prettify",
-                "description": "Prettifies a `json` value to print it.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "prettify",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            },
-            {
-              "metadata": {
-                "label": "read",
-                "description": "Extract details from the given JSON value using the provided query template expression.\n\n```ballerina\nread({id: 1, \"name\": \"John Doe\"}, `$.name`) => \"John Doe\"\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_data.jsondata_1.1.3.png"
-              },
-              "codedata": {
-                "node": "FUNCTION_CALL",
-                "org": "ballerina",
-                "module": "data.jsondata",
-                "packageName": "data.jsondata",
-                "symbol": "read",
-                "version": "1.1.3"
-              },
-              "enabled": true
-            }
-          ]
-        },
-        {
-          "metadata": {
             "label": "ai",
             "description": "",
             "keywords": []
@@ -295,7 +174,7 @@
               "metadata": {
                 "label": "getTools",
                 "description": "Get the tools registered with the agent.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -303,7 +182,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "getTools",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -311,7 +190,7 @@
               "metadata": {
                 "label": "chunkDocumentRecursively",
                 "description": "Provides functionality to recursively chunk a text document using a configurable strategy.\n\nThe chunking process begins with the specified strategy and recursively falls back to\nfiner-grained strategies if the content exceeds the configured `maxChunkSize`. Overlapping content\nbetween chunks can be controlled using `maxOverlapSize`.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -319,7 +198,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "chunkDocumentRecursively",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -327,7 +206,7 @@
               "metadata": {
                 "label": "chunkMarkdownDocument",
                 "description": "Provides functionality to recursively chunk a markdown document using a configurable strategy.\n\nThe chunking process begins with the specified strategy and recursively falls back to\nfiner-grained strategies if the content exceeds the configured `maxChunkSize`. Overlapping content\nbetween chunks can be controlled using `maxOverlapSize`.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -335,7 +214,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "chunkMarkdownDocument",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -343,7 +222,7 @@
               "metadata": {
                 "label": "chunkHtmlDocument",
                 "description": "Provides functionality to recursively chunk a HTML document using a configurable strategy.\n\nThe chunking process begins with the specified strategy and recursively falls back to\nfiner-grained strategies if the content exceeds the configured `maxChunkSize`. Overlapping content\nbetween chunks can be controlled using `maxOverlapSize`.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -351,7 +230,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "chunkHtmlDocument",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -359,7 +238,7 @@
               "metadata": {
                 "label": "extractToolsFromOpenApiSpecFile",
                 "description": "Extracts the Http tools from the given OpenAPI specification file.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -367,7 +246,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "extractToolsFromOpenApiSpecFile",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -375,7 +254,7 @@
               "metadata": {
                 "label": "extractToolsFromOpenApiJsonSpec",
                 "description": "Extracts the Http tools from the given OpenAPI specification as a JSON \n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -383,7 +262,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "extractToolsFromOpenApiJsonSpec",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -391,7 +270,7 @@
               "metadata": {
                 "label": "parseOpenApiSpec",
                 "description": "Parses the given OpenAPI specification as a JSON to a OpenApiSpec object.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -399,7 +278,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "parseOpenApiSpec",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -407,7 +286,7 @@
               "metadata": {
                 "label": "getDefaultModelProvider",
                 "description": "Creates a default model provider based on the provided `wso2ProviderConfig`.",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -415,7 +294,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "getDefaultModelProvider",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -423,7 +302,7 @@
               "metadata": {
                 "label": "getDefaultEmbeddingProvider",
                 "description": "Creates a default embedding provider based on the provided `wso2ProviderConfig`.",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -431,7 +310,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "getDefaultEmbeddingProvider",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -439,7 +318,7 @@
               "metadata": {
                 "label": "augmentUserQuery",
                 "description": "Augments the user's query with relevant context.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -447,7 +326,39 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "augmentUserQuery",
-                "version": "1.6.1"
+                "version": "1.11.1"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "loadConversationThreads",
+                "description": "Loads conversation threads from a evaluation dataset JSON file.\n\nParses an evaluation set JSON file containing conversation threads with agent traces.\nThe JSON must contain a root object with an array of threads, where each thread represents\na conversation thread with multiple traces of agent executions.\n\nExpected structure: `{ \"id\": \"...\", \"name\": \"...\", \"description\": \"...\", \"threads\": [...] }`\nwhere each thread in the array has `id`, `description`, and `traces` fields.\n",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "ai",
+                "packageName": "ai",
+                "symbol": "loadConversationThreads",
+                "version": "1.11.1"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "getUserQuery",
+                "description": "Extracts the user query from a conversation trace.\n",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "ai",
+                "packageName": "ai",
+                "symbol": "getUserQuery",
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -455,7 +366,7 @@
               "metadata": {
                 "label": "executeTool",
                 "description": "Executes an AgentTool.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -463,7 +374,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "executeTool",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -471,7 +382,7 @@
               "metadata": {
                 "label": "getToolConfigs",
                 "description": "Generates a array of `ToolConfig` from the given list of function pointers.\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -479,7 +390,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "getToolConfigs",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             },
@@ -487,7 +398,7 @@
               "metadata": {
                 "label": "getPermittedMcpToolConfigs",
                 "description": "Constructs the list of permitted MCP tool configurations by querying the MCP server.\n\nThis function initializes the MCP client using the provided implementation information\nand retrieves the list of tools permitted for use. Each permitted tool is then associated\nwith a corresponding MCP function tool dispatcher.\n\nA tool dispatcher is a function with the following signature:\n```ballerina\n@ai:AgentTool\nisolated function (mcp:CallToolParams) returns mcp:CallToolResult|error;\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.6.1.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_ai_1.11.1.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -495,7 +406,7 @@
                 "module": "ai",
                 "packageName": "ai",
                 "symbol": "getPermittedMcpToolConfigs",
-                "version": "1.6.1"
+                "version": "1.11.1"
               },
               "enabled": true
             }
@@ -508,6 +419,86 @@
             "keywords": []
           },
           "items": [
+            {
+              "metadata": {
+                "label": "fileReadBytes",
+                "description": "Read the entire file content as a byte array.\n```ballerina\nbyte[]|io:Error content = io:fileReadBytes(\"./resources/myfile.txt\");\n```",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_io_1.8.0.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "io",
+                "packageName": "io",
+                "symbol": "fileReadBytes",
+                "version": "1.8.0"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "fileReadBlocksAsStream",
+                "description": "Read the entire file content as a stream of blocks.\n```ballerina\nstream<io:Block, io:Error?>|io:Error content = io:fileReadBlocksAsStream(\"./resources/myfile.txt\", 1000);\n```",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_io_1.8.0.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "io",
+                "packageName": "io",
+                "symbol": "fileReadBlocksAsStream",
+                "version": "1.8.0"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "fileWriteBytes",
+                "description": "Write a set of bytes to a file.\n```ballerina\nbyte[] content = [60, 78, 39, 28];\nio:Error? result = io:fileWriteBytes(\"./resources/myfile.txt\", content);\n```",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_io_1.8.0.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "io",
+                "packageName": "io",
+                "symbol": "fileWriteBytes",
+                "version": "1.8.0"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "fileWriteBlocksFromStream",
+                "description": "Write a byte stream to a file.\n```ballerina\nbyte[] content = [[60, 78, 39, 28]];\nstream<byte[], io:Error?> byteStream = content.toStream();\nio:Error? result = io:fileWriteBlocksFromStream(\"./resources/myfile.txt\", byteStream);\n```",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_io_1.8.0.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "io",
+                "packageName": "io",
+                "symbol": "fileWriteBlocksFromStream",
+                "version": "1.8.0"
+              },
+              "enabled": true
+            },
+            {
+              "metadata": {
+                "label": "fileReadCsv",
+                "description": "Read file content as a CSV.\nWhen the expected data type is record[], the first entry of the csv file should contain matching headers.\n```ballerina\nstring[][]|io:Error content = io:fileReadCsv(\"./resources/myfile.csv\");\nrecord{}[]|io:Error content = io:fileReadCsv(\"./resources/myfile.csv\");\n```",
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_io_1.8.0.png"
+              },
+              "codedata": {
+                "node": "FUNCTION_CALL",
+                "org": "ballerina",
+                "module": "io",
+                "packageName": "io",
+                "symbol": "fileReadCsv",
+                "version": "1.8.0"
+              },
+              "enabled": true
+            },
             {
               "metadata": {
                 "label": "fileReadJson",
@@ -617,7 +608,7 @@
               "metadata": {
                 "label": "utcFromString",
                 "description": "Converts from RFC 3339 timestamp (e.g., `2007-12-03T10:15:30.00Z`) to Utc.\n```ballerina\ntime:Utc|time:Error utc = time:utcFromString(\"2007-12-03T10:15:30.00Z\");\n```",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_time_2.7.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_time_2.8.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -625,7 +616,7 @@
                 "module": "time",
                 "packageName": "time",
                 "symbol": "utcFromString",
-                "version": "2.7.0"
+                "version": "2.8.0"
               },
               "enabled": true
             },
@@ -633,7 +624,7 @@
               "metadata": {
                 "label": "utcNow",
                 "description": "Returns the UTC representing the current time (current instant of the system clock in seconds from the epoch of `1970-01-01T00:00:00`).\n```ballerina\ntime:Utc utc = time:utcNow();\n```",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_time_2.7.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_time_2.8.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -641,7 +632,7 @@
                 "module": "time",
                 "packageName": "time",
                 "symbol": "utcNow",
-                "version": "2.7.0"
+                "version": "2.8.0"
               },
               "enabled": true
             }
@@ -670,7 +661,7 @@
               "metadata": {
                 "label": "printDebug",
                 "description": "Prints debug logs.\n```ballerina\nlog:printDebug(\"debug message\", id = 845315)\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.14.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.17.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -678,7 +669,7 @@
                 "module": "log",
                 "packageName": "log",
                 "symbol": "printDebug",
-                "version": "2.14.0"
+                "version": "2.17.0"
               },
               "enabled": true
             },
@@ -686,7 +677,7 @@
               "metadata": {
                 "label": "printError",
                 "description": "Prints error logs.\n```ballerina\nerror e = error(\"error occurred\");\nlog:printError(\"error log with cause\", 'error = e, id = 845315);\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.14.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.17.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -694,7 +685,7 @@
                 "module": "log",
                 "packageName": "log",
                 "symbol": "printError",
-                "version": "2.14.0"
+                "version": "2.17.0"
               },
               "enabled": true
             },
@@ -702,7 +693,7 @@
               "metadata": {
                 "label": "printInfo",
                 "description": "Prints info logs.\n```ballerina\nlog:printInfo(\"info message\", id = 845315)\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.14.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.17.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -710,7 +701,7 @@
                 "module": "log",
                 "packageName": "log",
                 "symbol": "printInfo",
-                "version": "2.14.0"
+                "version": "2.17.0"
               },
               "enabled": true
             },
@@ -718,7 +709,7 @@
               "metadata": {
                 "label": "printWarn",
                 "description": "Prints warn logs.\n```ballerina\nlog:printWarn(\"warn message\", id = 845315)\n```\n",
-                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.14.0.png"
+                "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_log_2.17.0.png"
               },
               "codedata": {
                 "node": "FUNCTION_CALL",
@@ -726,7 +717,7 @@
                 "module": "log",
                 "packageName": "log",
                 "symbol": "printWarn",
-                "version": "2.14.0"
+                "version": "2.17.0"
               },
               "enabled": true
             }
