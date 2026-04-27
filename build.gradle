@@ -337,7 +337,6 @@ task pack(type: com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
 
 task pullBallerinaModules {
     dependsOn pullBallerinaModule('ai', ballerinaxAiAgent)
-    dependsOn pullBallerinaModule('ai.agent', ballerinaxAiAgentLegacyVersion)
     dependsOn pullBallerinaModule('kafka', ballerinaxKafkaVersion)
     dependsOn pullBallerinaModule('rabbitmq', ballerinaxRabbitmqVersion)
     dependsOn pullBallerinaModule('solace', ballerinaxSolaceVersion)
