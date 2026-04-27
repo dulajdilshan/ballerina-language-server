@@ -46,7 +46,7 @@
         "metadata": {
           "label": "get",
           "description": "Retrieve a representation of a specified resource from an HTTP endpoint.\n",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png"
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png"
         },
         "codedata": {
           "node": "REMOTE_ACTION_CALL",
@@ -55,7 +55,7 @@
           "packageName": "http",
           "object": "Client",
           "symbol": "get",
-          "version": "2.15.4",
+          "version": "2.16.1",
           "lineRange": {
             "fileName": "clients.bal",
             "startLine": {
@@ -287,7 +287,7 @@
         "metadata": {
           "label": "HTTP",
           "description": "The HTTP client provides functionality to connect to remote HTTP services and perform requests using standard HTTP methods like GET, POST, PUT, DELETE, etc.\n",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png"
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png"
         },
         "codedata": {
           "node": "NEW_CONNECTION",
@@ -350,7 +350,7 @@
                 "typeMembers": [
                   {
                     "type": "ClientConfiguration",
-                    "packageInfo": "ballerina:http:2.15.4",
+                    "packageInfo": "ballerina:http:2.16.1",
                     "packageName": "http",
                     "kind": "RECORD_TYPE",
                     "selected": false
@@ -466,7 +466,7 @@
         "metadata": {
           "label": "get",
           "description": "Retrieve a representation of a specified resource from an HTTP endpoint.\n",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png"
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png"
         },
         "codedata": {
           "node": "REMOTE_ACTION_CALL",
@@ -475,7 +475,7 @@
           "packageName": "http",
           "object": "Client",
           "symbol": "get",
-          "version": "2.15.4",
+          "version": "2.16.1",
           "lineRange": {
             "fileName": "clients.bal",
             "startLine": {
@@ -866,7 +866,7 @@
         "metadata": {
           "label": "HTTP",
           "description": "The HTTP client provides functionality to connect to remote HTTP services and perform requests using standard HTTP methods like GET, POST, PUT, DELETE, etc.\n",
-          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.15.4.png"
+          "icon": "https://bcentral-packageicons.azureedge.net/images/ballerina_http_2.16.1.png"
         },
         "codedata": {
           "node": "NEW_CONNECTION",
@@ -929,7 +929,7 @@
                 "typeMembers": [
                   {
                     "type": "ClientConfiguration",
-                    "packageInfo": "ballerina:http:2.15.4",
+                    "packageInfo": "ballerina:http:2.16.1",
                     "packageName": "http",
                     "kind": "RECORD_TYPE",
                     "selected": false
