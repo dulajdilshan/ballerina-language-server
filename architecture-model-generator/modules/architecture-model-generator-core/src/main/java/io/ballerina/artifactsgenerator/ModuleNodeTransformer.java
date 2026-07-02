@@ -44,7 +44,6 @@ import io.ballerina.compiler.syntax.tree.SyntaxKind;
 import io.ballerina.compiler.syntax.tree.Token;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypeDescriptorNode;
-import io.ballerina.flowmodelgenerator.core.utils.WorkflowUtil;
 import io.ballerina.modelgenerator.commons.CommonUtils;
 import org.ballerinalang.langserver.commons.BallerinaCompilerApi;
 
@@ -89,7 +88,6 @@ public class ModuleNodeTransformer extends NodeTransformer<Optional<Artifact>> {
         Artifact.Builder functionBuilder = new Artifact.Builder(functionDefinitionNode);
         String functionName = functionDefinitionNode.functionName().text();
 
-        Optional<Symbol> functionSymbol = semanticModel.symbol(functionDefinitionNode);
         if (functionName.equals(MAIN_FUNCTION_NAME)) {
             functionBuilder
                     .name(AUTOMATION_FUNCTION_NAME)
@@ -116,14 +114,6 @@ public class ModuleNodeTransformer extends NodeTransformer<Optional<Artifact>> {
             functionBuilder
                     .name(functionName)
                     .type(Artifact.Type.REMOTE);
-        } else if (functionSymbol.isPresent() && WorkflowUtil.isWorkflowFunction(functionSymbol.get())) {
-            functionBuilder
-                    .name(functionName)
-                    .type(Artifact.Type.WORKFLOW);
-        } else if (functionSymbol.isPresent() && WorkflowUtil.isActivityFunction(functionSymbol.get())) {
-            functionBuilder
-                    .name(functionName)
-                    .type(Artifact.Type.ACTIVITY);
         } else {
             functionBuilder
                     .name(functionName)

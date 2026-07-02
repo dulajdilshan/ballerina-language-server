@@ -3601,9 +3601,6 @@
       "name": "nytimes.archive",
       "version": "1.5.1",
       "description": "Connects to [New York Times Archive API](https://developer.nytimes.com/docs/archive-product/1/overview) from Ballerina"
-      "name": "workflow",
-      "version": "0.4.0",
-      "description": "The `ballerina/workflow` library provides durable, fault-tolerant workflow orchestration for Ballerina applications. It lets you define long-running business processes — spanning minutes, hours, or days — that automatically recover from crashes and process restarts without losing progress."
     },
     {
       "name": "iris.subscriptions",

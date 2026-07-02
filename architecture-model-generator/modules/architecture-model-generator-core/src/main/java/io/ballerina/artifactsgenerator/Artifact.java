@@ -64,7 +64,6 @@ public record Artifact(String id, LineRange location, String type, String name, 
     private static final String CATEGORY_TYPES = "Types";
     private static final String CATEGORY_CONNECTIONS = "Connections";
     private static final String CATEGORY_VARIABLES = "Variables";
-    private static final String CATEGORY_WORKFLOWS = "Workflows";
     private static final String CATEGORY_DEFAULT = "Others";
 
     private static final Map<String, String> typeCategoryMap = Map.ofEntries(
@@ -79,9 +78,7 @@ public record Artifact(String id, LineRange location, String type, String name, 
             Map.entry(Type.CONFIGURABLE.name(), CATEGORY_CONFIGURATIONS),
             Map.entry(Type.TYPE.name(), CATEGORY_TYPES),
             Map.entry(Type.CONNECTION.name(), CATEGORY_CONNECTIONS),
-            Map.entry(Type.VARIABLE.name(), CATEGORY_VARIABLES),
-            Map.entry(Type.WORKFLOW.name(), CATEGORY_WORKFLOWS),
-            Map.entry(Type.ACTIVITY.name(), CATEGORY_WORKFLOWS));
+            Map.entry(Type.VARIABLE.name(), CATEGORY_VARIABLES));
 
     private static final Map<String, String> entryPointMap = Map.ofEntries(
             Map.entry("http", "HTTP Service"),
@@ -140,9 +137,7 @@ public record Artifact(String id, LineRange location, String type, String name, 
         CONFIGURABLE,
         TYPE,
         CONNECTION,
-        VARIABLE,
-        WORKFLOW,
-        ACTIVITY
+        VARIABLE
     }
 
     public enum Scope {
