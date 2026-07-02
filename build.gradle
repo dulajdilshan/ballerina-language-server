@@ -352,6 +352,7 @@ task pullBallerinaModules {
     dependsOn pullBallerinaModule('trigger.shopify', ballerinaxShopifyTriggerVersion)
     dependsOn pullBallerinaModule('trigger.hubspot', ballerinaxHubspotTriggerVersion)
     dependsOn pullBallerinaModule('np', ballerinaxNp)
+    dependsOn pullBallerinaModule('workflow', ballerinaWorkflowVersion, "ballerina")
 }
 
 test {
