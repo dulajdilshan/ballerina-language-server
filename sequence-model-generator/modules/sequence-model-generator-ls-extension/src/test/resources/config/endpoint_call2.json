@@ -93,9 +93,11 @@
               },
               "params": [
                 {
+                  "type": "string",
                   "value": "param1 = \"param1\""
                 },
                 {
+                  "type": "string",
                   "value": "param2 = \"param2\""
                 }
               ],
@@ -232,6 +234,7 @@
               },
               "params": [
                 {
+                  "type": "map<string|string[]>",
                   "value": "headers = {\n            \"first-header\": \"first\",\n            \"second-header\": \"second\"\n        }"
                 }
               ],
@@ -322,6 +325,10 @@
             "kind": "INTERACTION",
             "properties": {
               "resourcePath": "apples",
+              "name": {
+                "type": "string",
+                "value": "get"
+              },
               "expr": {
                 "type": "http:Client",
                 "value": "foodClient"
