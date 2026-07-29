@@ -50,7 +50,7 @@
             "targetId": "33796",
             "kind": "INTERACTION",
             "properties": {
-              "resourcePath": "hello",
+              "resourcePath": "/hello",
               "name": {
                 "type": "string",
                 "value": "get"

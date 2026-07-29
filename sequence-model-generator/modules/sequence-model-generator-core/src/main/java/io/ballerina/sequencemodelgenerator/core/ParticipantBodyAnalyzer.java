@@ -111,7 +111,7 @@ public class ParticipantBodyAnalyzer extends NodeVisitor {
         SeparatedNodeList<Node> nodes = resourceAccessActionNode.resourceAccessPath();
         String resourcePath = nodes.stream()
                 .map(Node::toSourceCode)
-                .collect(Collectors.joining("/"));
+                .collect(Collectors.joining("/", "/", ""));
         nodeBuilder.property(Interaction.RESOURCE_PATH, resourcePath);
 
         nodeBuilder
