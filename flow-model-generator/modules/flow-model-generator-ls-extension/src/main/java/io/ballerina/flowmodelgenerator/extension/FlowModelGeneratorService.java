@@ -667,9 +667,15 @@ public class FlowModelGeneratorService implements ExtendedLanguageServerService 
             try {
                 Path filePath = Path.of(request.filePath());
                 WorkspaceManager workspaceManager = this.workspaceManagerProxy.get();
-                // The search is scoped to the project rather than to the requested file, and the file need not exist
-                // on disk yet (e.g., searching for connectors before connections.bal is created). Hence, resolve the
-                // project without requiring the file, instead of creating it.
+                // Every search kind is scoped to the project rather than to the requested file, so the path only
+                // identifies the project to search in and the file need not exist on disk. Hence, resolve the project
+                // without requiring the file, instead of creating it. A connector search before connections.bal is
+                // created is one such case, but the relaxation is general and is not specific to that kind.
+                //
+                // A kind that uses the position now proceeds with a position pointing into a file that does not
+                // exist, instead of failing while the project is resolved. Such a position matches no node of the
+                // project, since the commands compare it against the line ranges of the existing sources, so it
+                // simply narrows nothing.
                 Project project = FileSystemUtils.resolveProject(workspaceManager, filePath);
                 SearchCommand.Kind searchKind = SearchCommand.Kind.valueOf(request.searchKind());
                 LineRange position = request.position();
