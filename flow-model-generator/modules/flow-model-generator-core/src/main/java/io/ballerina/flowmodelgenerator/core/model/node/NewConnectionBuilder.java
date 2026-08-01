@@ -125,11 +125,13 @@ public class NewConnectionBuilder extends CallBuilder {
         Codedata codedata = context.codedata();
         FunctionData functionData;
 
+        String packageName = codedata.packageName() == null || codedata.packageName().isEmpty() ?
+                codedata.module() : codedata.packageName();
+
         FunctionDataBuilder functionDataBuilder = new FunctionDataBuilder()
                 .parentSymbolType(codedata.object())
                 .name(codedata.symbol())
-                .moduleInfo(new ModuleInfo(codedata.org(), codedata.packageName(), codedata.module(),
-                        codedata.version()))
+                .moduleInfo(new ModuleInfo(codedata.org(), packageName, codedata.module(), codedata.version()))
                 .lsClientLogger(context.lsClientLogger())
                 .functionResultKind(FunctionData.Kind.CONNECTOR)
                 .userModuleInfo(moduleInfo)
