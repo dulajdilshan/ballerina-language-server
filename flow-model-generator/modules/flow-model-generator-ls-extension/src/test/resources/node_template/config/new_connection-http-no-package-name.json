@@ -4,14 +4,13 @@
     "line": 52,
     "offset": 4
   },
-  "description": "",
+  "description": "Node template of an existing connection whose codedata carries no package name",
   "codedata": {
     "node": "NEW_CONNECTION",
     "org": "ballerina",
     "module": "http",
     "object": "Client",
-    "symbol": "init",
-    "version": "2.16.6"
+    "symbol": "init"
   },
   "output": {
     "id": "31",
