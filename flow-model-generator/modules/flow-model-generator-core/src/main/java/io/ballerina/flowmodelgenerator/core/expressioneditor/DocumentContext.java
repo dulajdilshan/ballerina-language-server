@@ -179,7 +179,7 @@ public class DocumentContext {
 
         // Resolve the module that the file belongs to. WorkspaceManager.module() cannot resolve a path that does not
         // exist on disk. Hence, the parent directory is used for such a file.
-        Path modulePath = Files.isDirectory(inputFilePath) ? inputFilePath : inputFilePath.getParent();
+        Path modulePath = Files.exists(inputFilePath) ? inputFilePath : inputFilePath.getParent();
         if (modulePath == null) {
             throw new IllegalStateException("Module not found for the file: " + inputFilePath);
         }
