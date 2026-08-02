@@ -35,12 +35,13 @@ import org.eclipse.lsp4j.FileEvent;
 import org.eclipse.lsp4j.TextDocumentItem;
 
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A utility class for file system operations interacting with the Ballerina language server.
@@ -54,7 +55,8 @@ import java.util.Optional;
  */
 public class FileSystemUtils {
 
-    private static final List<Path> CREATED_FILES = new ArrayList<>();
+    // Two requests may create a file of the same package at once, and the list is iterated while it is written to.
+    private static final List<Path> CREATED_FILES = new CopyOnWriteArrayList<>();
 
     /**
      * Retrieves a document from the workspace manager for the given file path. If the file does not exist, it creates a
@@ -71,10 +73,7 @@ public class FileSystemUtils {
             // Create the file on disk first so that ProjectPaths.packageRoot() can locate the package root.
             // Without this, workspaceManager.document() throws ProjectException (not NoSuchElementException)
             // for non-existent files, bypassing the catch block below.
-            if (!Files.exists(filePath)) {
-                Files.createFile(filePath);
-                CREATED_FILES.add(filePath);
-            }
+            createFileIfAbsent(filePath);
             document = workspaceManager.document(filePath).orElseThrow();
         } catch (NoSuchElementException e) {
             // File exists on disk but is not yet loaded in the workspace; load it via didOpen.
@@ -98,6 +97,28 @@ public class FileSystemUtils {
             throw new RuntimeException("Error occurred while creating the file: " + filePath, e);
         }
         return document;
+    }
+
+    /**
+     * Creates the file when it is absent, and tolerates a creation that another request performs at the same time.
+     * <p>
+     * The check of the presence of the file and its creation cannot be atomic on the file system. Hence, the
+     * {@link FileAlreadyExistsException} of the loser of that race is held, since the file that it required is
+     * present by then, and the request that created it holds it for removal.
+     *
+     * @param filePath the path of the file to create
+     * @throws IOException if the file cannot be created
+     */
+    private static void createFileIfAbsent(Path filePath) throws IOException {
+        if (Files.exists(filePath)) {
+            return;
+        }
+        try {
+            Files.createFile(filePath);
+            CREATED_FILES.add(filePath);
+        } catch (FileAlreadyExistsException e) {
+            // Another request created the file first, and it holds the file for removal.
+        }
     }
 
     /**
@@ -226,8 +247,7 @@ public class FileSystemUtils {
         } catch (ProjectException e) {
             // Create a new file as it does not exist
             try {
-                Files.createFile(filePath);
-                CREATED_FILES.add(filePath);
+                createFileIfAbsent(filePath);
                 FileEvent fileEvent = new FileEvent(filePath.toUri().toString(), FileChangeType.Created);
                 workspaceManager.didChangeWatched(filePath, fileEvent);
             } catch (IOException | WorkspaceDocumentException fileCreationException) {
@@ -278,5 +298,8 @@ public class FileSystemUtils {
                 throw new RuntimeException("Error occurred while deleting the file: " + path, e);
             }
         });
+        // The list is cleared so that it holds the files of the current test class alone, and so that it does not
+        // grow without a bound in a language server that is long lived.
+        CREATED_FILES.clear();
     }
 }

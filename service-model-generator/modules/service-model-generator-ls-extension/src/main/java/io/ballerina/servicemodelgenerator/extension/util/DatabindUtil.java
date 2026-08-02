@@ -72,6 +72,7 @@ import static io.ballerina.servicemodelgenerator.extension.util.Constants.DATA_B
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.DATA_BINDING_TEMPLATE;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.EMPTY_ARRAY;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.KIND_REQUIRED;
+import static io.ballerina.servicemodelgenerator.extension.util.Constants.MAIN_BAL;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.PAYLOAD_FIELD_NAME_PROPERTY;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.TYPES_BAL;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.WRAPPER_TYPE_NAME_PROPERTY;
@@ -362,7 +363,7 @@ public final class DatabindUtil {
         String wrapperTypeName = "";
         if (match.sourceFunctionNode() != null && context.semanticModel() != null && context.project() != null) {
             String paramName = dataBindingParam.getName().getValue();
-            Document mainDocument = getDocumentByName(context.filePath(), "main.bal", context.workspaceManager());
+            Document mainDocument = getDocumentByName(context.filePath(), MAIN_BAL, context.workspaceManager());
 
             if (mainDocument != null) {
                 String extractedTypeName = extractExistingDatabindTypeName(match.sourceFunctionNode(), paramName,
@@ -788,7 +789,7 @@ public final class DatabindUtil {
         TextEdit deleteEdit = new TextEdit(Utils.toRange(typeDefToDelete.lineRange()), "");
         edits.add(deleteEdit);
 
-        Path typesFilePath = getFilePathForFile(context.filePath(), context.workspaceManager(), "types.bal");
+        Path typesFilePath = getFilePathForFile(context.filePath(), context.workspaceManager(), TYPES_BAL);
         if (typesFilePath == null) {
             return Map.of();
         }
@@ -875,7 +876,7 @@ public final class DatabindUtil {
             return prefix;
         }
 
-        Document mainDocument = getDocumentByName(contextFilePath, "main.bal", workspaceManager);
+        Document mainDocument = getDocumentByName(contextFilePath, MAIN_BAL, workspaceManager);
         if (mainDocument == null) {
             return prefix;
         }
@@ -1005,7 +1006,7 @@ public final class DatabindUtil {
         edits.add(typeEdit);
 
         // Construct the path to types.bal
-        Path typesFilePath = getFilePathForFile(contextFilePath, workspaceManager, "types.bal");
+        Path typesFilePath = getFilePathForFile(contextFilePath, workspaceManager, TYPES_BAL);
         if (typesFilePath == null) {
             return Map.of();
         }
@@ -1278,7 +1279,7 @@ public final class DatabindUtil {
         // Create a TextEdit to replace the old definition
         TextEdit replaceEdit = new TextEdit(Utils.toRange(existingTypeDef.lineRange()), newTypeDefinition);
         edits.add(replaceEdit);
-        Path typesFilePath = getFilePathForFile(context.filePath(), context.workspaceManager(), "types.bal");
+        Path typesFilePath = getFilePathForFile(context.filePath(), context.workspaceManager(), TYPES_BAL);
         if (typesFilePath == null) {
             return Map.of();
         }

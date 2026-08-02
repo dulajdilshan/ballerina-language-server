@@ -21,13 +21,11 @@ package io.ballerina.servicemodelgenerator.extension;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import io.ballerina.modelgenerator.commons.AbstractLSTest;
-import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.servicemodelgenerator.extension.model.Codedata;
 import io.ballerina.servicemodelgenerator.extension.model.Function;
 import io.ballerina.servicemodelgenerator.extension.model.request.FunctionSourceRequest;
 import org.eclipse.lsp4j.TextEdit;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.io.BufferedReader;
@@ -47,6 +45,8 @@ import java.util.Map;
  */
 public class AddFunctionTest extends AbstractLSTest {
 
+    private static final String NO_TYPES_BAL_CONFIG = "add_kafka_on_consumer_record_no_types_bal.json";
+
     private static final Type TEXT_EDIT_LIST_TYPE = new TypeToken<Map<String, List<TextEdit>>>() {
     }.getType();
 
@@ -57,6 +57,14 @@ public class AddFunctionTest extends AbstractLSTest {
         BufferedReader bufferedReader = Files.newBufferedReader(configJsonPath);
         TestConfig testConfig = gson.fromJson(bufferedReader, TestConfig.class);
         bufferedReader.close();
+
+        // The case covers the absence of types.bal. A file left behind by an interrupted run would let the test pass
+        // for the wrong reason, so its absence is asserted instead of assumed.
+        if (config.getFileName().toString().equals(NO_TYPES_BAL_CONFIG)) {
+            Path typesBal = sourceDir.resolve(Path.of("sample2", "types.bal"));
+            Assert.assertFalse(Files.exists(typesBal),
+                    "A types.bal of a previous run is present, and this test has to start without it: " + typesBal);
+        }
 
         FunctionSourceRequest request = new FunctionSourceRequest(
                 sourceDir.resolve(testConfig.filePath()).toAbsolutePath().toString(),
@@ -95,11 +103,6 @@ public class AddFunctionTest extends AbstractLSTest {
 //            updateConfig(configJsonPath, updatedConfig);
             Assert.fail(String.format("Failed test: '%s' (%s)", testConfig.description(), configJsonPath));
         }
-    }
-
-    @AfterClass
-    void cleanFiles() {
-        FileSystemUtils.deleteCreatedFiles();
     }
 
     @Override
