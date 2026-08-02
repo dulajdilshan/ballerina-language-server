@@ -21,11 +21,13 @@ package io.ballerina.servicemodelgenerator.extension;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import io.ballerina.modelgenerator.commons.AbstractLSTest;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.servicemodelgenerator.extension.model.Codedata;
 import io.ballerina.servicemodelgenerator.extension.model.Function;
 import io.ballerina.servicemodelgenerator.extension.model.request.FunctionSourceRequest;
 import org.eclipse.lsp4j.TextEdit;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.io.BufferedReader;
@@ -93,6 +95,11 @@ public class AddFunctionTest extends AbstractLSTest {
 //            updateConfig(configJsonPath, updatedConfig);
             Assert.fail(String.format("Failed test: '%s' (%s)", testConfig.description(), configJsonPath));
         }
+    }
+
+    @AfterClass
+    void cleanFiles() {
+        FileSystemUtils.deleteCreatedFiles();
     }
 
     @Override

@@ -37,6 +37,7 @@ import io.ballerina.compiler.syntax.tree.ServiceDeclarationNode;
 import io.ballerina.compiler.syntax.tree.SimpleNameReferenceNode;
 import io.ballerina.compiler.syntax.tree.SyntaxInfo;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.Project;
 import io.ballerina.servicemodelgenerator.extension.model.Codedata;
@@ -54,6 +55,7 @@ import org.ballerinalang.langserver.common.utils.CommonUtil;
 import org.ballerinalang.langserver.commons.workspace.WorkspaceManager;
 import org.eclipse.lsp4j.TextEdit;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -71,6 +73,7 @@ import static io.ballerina.servicemodelgenerator.extension.util.Constants.DATA_B
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.EMPTY_ARRAY;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.KIND_REQUIRED;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.PAYLOAD_FIELD_NAME_PROPERTY;
+import static io.ballerina.servicemodelgenerator.extension.util.Constants.TYPES_BAL;
 import static io.ballerina.servicemodelgenerator.extension.util.Constants.WRAPPER_TYPE_NAME_PROPERTY;
 import static io.ballerina.servicemodelgenerator.extension.util.Utils.getFunctionModel;
 import static io.ballerina.servicemodelgenerator.extension.util.Utils.getImportStmt;
@@ -935,7 +938,7 @@ public final class DatabindUtil {
                                                                               String contextFilePath,
                                                                               WorkspaceManager workspaceManager,
                                                                               Map<String, String> importsForTypeDef) {
-        Document typesDocument = getTypesDocument(contextFilePath, workspaceManager);
+        Document typesDocument = getOrCreateTypesDocument(contextFilePath, workspaceManager);
         if (typesDocument == null || typesDocument.syntaxTree() == null) {
             return null;
         }
@@ -1020,7 +1023,9 @@ public final class DatabindUtil {
     private static Document getDocumentByName(String contextFilePath, String fileName,
                                               WorkspaceManager workspaceManager) {
         Path filePath = getFilePathForFile(contextFilePath, workspaceManager, fileName);
-        if (filePath == null) {
+        // WorkspaceManager.document() rejects a path that does not exist on disk with a ProjectException. Hence, the
+        // absence of the file is checked beforehand, since the document is only read here.
+        if (filePath == null || !Files.exists(filePath)) {
             return null;
         }
         Optional<Document> documentOpt = workspaceManager.document(filePath);
@@ -1028,15 +1033,35 @@ public final class DatabindUtil {
     }
 
     /**
+     * Gets the types.bal document in the project, and creates it when it does not exist.
+     * <p>
+     * The type definition of the data binding is written to types.bal, which is one of the files that the project
+     * need not hold yet. Hence, the document is resolved through {@link FileSystemUtils#getDocument}, which creates
+     * the file when it is absent.
+     *
+     * @param contextFilePath  The context file path for locating types.bal
+     * @param workspaceManager The workspace manager for document retrieval
+     * @return The types.bal Document, or null if the path cannot be resolved
+     */
+    private static Document getOrCreateTypesDocument(String contextFilePath,
+                                                     WorkspaceManager workspaceManager) {
+        Path typesFilePath = getFilePathForFile(contextFilePath, workspaceManager, TYPES_BAL);
+        if (typesFilePath == null) {
+            return null;
+        }
+        return FileSystemUtils.getDocument(workspaceManager, typesFilePath);
+    }
+
+    /**
      * Gets the types.bal document in the project.
      *
      * @param contextFilePath  The context file path for locating types.bal
      * @param workspaceManager The workspace manager for document retrieval
-     * @return The types.bal Document
+     * @return The types.bal Document, or null if it does not exist
      */
     private static Document getTypesDocument(String contextFilePath,
                                              WorkspaceManager workspaceManager) {
-        return getDocumentByName(contextFilePath, "types.bal", workspaceManager);
+        return getDocumentByName(contextFilePath, TYPES_BAL, workspaceManager);
     }
 
     /**

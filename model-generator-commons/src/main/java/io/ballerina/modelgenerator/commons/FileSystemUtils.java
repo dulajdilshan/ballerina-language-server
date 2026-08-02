@@ -16,17 +16,16 @@
  *  under the License.
  */
 
-package io.ballerina.flowmodelgenerator.core.utils;
+package io.ballerina.modelgenerator.commons;
 
 import io.ballerina.compiler.api.SemanticModel;
-import io.ballerina.flowmodelgenerator.core.model.Codedata;
-import io.ballerina.modelgenerator.commons.PackageUtil;
 import io.ballerina.projects.Document;
 import io.ballerina.projects.DocumentId;
 import io.ballerina.projects.Module;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ProjectException;
+import io.ballerina.tools.text.LineRange;
 import org.ballerinalang.langserver.commons.eventsync.exceptions.EventSyncException;
 import org.ballerinalang.langserver.commons.workspace.WorkspaceDocumentException;
 import org.ballerinalang.langserver.commons.workspace.WorkspaceManager;
@@ -239,18 +238,18 @@ public class FileSystemUtils {
     }
 
     /**
-     * Resolves the file path based on the provided codedata and project root.
+     * Resolves the file path based on the provided line range and project root.
      * <p>
-     * If the codedata does not have a line range, returns the project root. Otherwise, resolves the file path by
-     * combining the project root with the filename from the codedata's line range.
+     * If the line range is not available, returns the project root. Otherwise, resolves the file path by combining
+     * the project root with the filename of the line range.
      *
-     * @param codedata    The codedata containing file information
+     * @param lineRange   The line range holding the file information
      * @param projectRoot The project root path
      * @return The resolved file path
      */
-    public static Path resolveFilePathFromCodedata(Codedata codedata, Path projectRoot) {
-        if (codedata.lineRange() != null) {
-            String fileName = codedata.lineRange().fileName();
+    public static Path resolveFilePathFromLineRange(LineRange lineRange, Path projectRoot) {
+        if (lineRange != null) {
+            String fileName = lineRange.fileName();
             Path actualProjectRoot = projectRoot;
             if (Files.isRegularFile(projectRoot)) {
                 Path parent = projectRoot.getParent();
