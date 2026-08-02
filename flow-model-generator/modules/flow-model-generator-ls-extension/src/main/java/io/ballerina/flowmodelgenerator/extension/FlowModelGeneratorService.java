@@ -39,7 +39,6 @@ import io.ballerina.flowmodelgenerator.core.analyzers.function.ModuleNodeAnalyze
 import io.ballerina.flowmodelgenerator.core.diagnostics.DiagnosticRequest;
 import io.ballerina.flowmodelgenerator.core.diagnostics.DiagnosticsDebouncer;
 import io.ballerina.flowmodelgenerator.core.search.SearchCommand;
-import io.ballerina.flowmodelgenerator.core.utils.FileSystemUtils;
 import io.ballerina.flowmodelgenerator.extension.request.ComponentDeleteRequest;
 import io.ballerina.flowmodelgenerator.extension.request.CopilotContextRequest;
 import io.ballerina.flowmodelgenerator.extension.request.EnclosedFuncDefRequest;
@@ -66,6 +65,7 @@ import io.ballerina.flowmodelgenerator.extension.response.FlowNodeDeleteResponse
 import io.ballerina.flowmodelgenerator.extension.response.FunctionDefinitionResponse;
 import io.ballerina.flowmodelgenerator.extension.response.SearchNodesResponse;
 import io.ballerina.modelgenerator.commons.CommonUtils;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.modelgenerator.commons.PackageUtil;
 import io.ballerina.projects.Document;
