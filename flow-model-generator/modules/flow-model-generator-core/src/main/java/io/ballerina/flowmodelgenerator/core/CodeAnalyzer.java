@@ -163,10 +163,10 @@ import io.ballerina.flowmodelgenerator.core.model.node.VectorStoreBuilder;
 import io.ballerina.flowmodelgenerator.core.model.node.WaitBuilder;
 import io.ballerina.flowmodelgenerator.core.model.node.XmlPayloadBuilder;
 import io.ballerina.flowmodelgenerator.core.utils.ConnectorUtil;
-import io.ballerina.flowmodelgenerator.core.utils.FileSystemUtils;
 import io.ballerina.flowmodelgenerator.core.utils.FlowNodeUtil;
 import io.ballerina.flowmodelgenerator.core.utils.ParamUtils;
 import io.ballerina.modelgenerator.commons.CommonUtils;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.modelgenerator.commons.FunctionData;
 import io.ballerina.modelgenerator.commons.FunctionDataBuilder;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
@@ -735,7 +735,7 @@ public class CodeAnalyzer extends NodeVisitor {
                 .build();
 
         Path agentFilePath =
-                FileSystemUtils.resolveFilePathFromCodedata(codedata, project.sourceRoot());
+                FileSystemUtils.resolveFilePathFromLineRange(codedata.lineRange(), project.sourceRoot());
 
         NodeBuilder.TemplateContext context =
                 new NodeBuilder.TemplateContext(workspaceManager, agentFilePath,
