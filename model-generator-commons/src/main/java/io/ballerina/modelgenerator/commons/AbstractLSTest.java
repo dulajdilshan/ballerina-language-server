@@ -439,6 +439,7 @@ public abstract class AbstractLSTest {
 
     @AfterClass
     public void shutDownLanguageServer() {
+        FileSystemUtils.deleteCreatedFiles();
         if (this.serviceEndpoint == null) {
             return;
         }

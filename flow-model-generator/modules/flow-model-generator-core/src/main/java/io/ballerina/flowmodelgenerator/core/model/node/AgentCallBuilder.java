@@ -34,9 +34,9 @@ import io.ballerina.flowmodelgenerator.core.model.NodeBuilder;
 import io.ballerina.flowmodelgenerator.core.model.NodeKind;
 import io.ballerina.flowmodelgenerator.core.model.Property;
 import io.ballerina.flowmodelgenerator.core.model.SourceBuilder;
-import io.ballerina.flowmodelgenerator.core.utils.FileSystemUtils;
 import io.ballerina.flowmodelgenerator.core.utils.FlowNodeUtil;
 import io.ballerina.modelgenerator.commons.CommonUtils;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.modelgenerator.commons.FunctionData;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.modelgenerator.commons.ParameterData;
@@ -408,7 +408,7 @@ public class AgentCallBuilder extends CallBuilder {
         Codedata agentCodedata = gson.fromJson(gson.toJson(agentCodedataObj), Codedata.class);
 
         Path agentFilePath =
-                FileSystemUtils.resolveFilePathFromCodedata(agentCodedata, projectRoot);
+                FileSystemUtils.resolveFilePathFromLineRange(agentCodedata.lineRange(), projectRoot);
 
         return new NodeBuilder.TemplateContext(sourceBuilder.workspaceManager, agentFilePath,
                 agentCodedata.lineRange().startLine(), agentCodedata, null);
@@ -444,7 +444,7 @@ public class AgentCallBuilder extends CallBuilder {
                                      TemplateContext agentTemplateContext, Path projectRoot,
                                      Map<Path, List<TextEdit>> allTextEdits) {
         Path agentFilePath =
-                FileSystemUtils.resolveFilePathFromCodedata(agentTemplateContext.codedata(), projectRoot);
+                FileSystemUtils.resolveFilePathFromLineRange(agentTemplateContext.codedata().lineRange(), projectRoot);
         SourceBuilder agentSourceBuilder = new SourceBuilder(agentNode, sourceBuilder.workspaceManager, agentFilePath);
         Map<Path, List<TextEdit>> agentTextEdits =
                 NodeBuilder.getNodeFromKind(agentNode.codedata().node()).toSource(agentSourceBuilder);
