@@ -39,7 +39,6 @@ import io.ballerina.flowmodelgenerator.core.analyzers.function.ModuleNodeAnalyze
 import io.ballerina.flowmodelgenerator.core.diagnostics.DiagnosticRequest;
 import io.ballerina.flowmodelgenerator.core.diagnostics.DiagnosticsDebouncer;
 import io.ballerina.flowmodelgenerator.core.search.SearchCommand;
-import io.ballerina.flowmodelgenerator.core.utils.FileSystemUtils;
 import io.ballerina.flowmodelgenerator.extension.request.ComponentDeleteRequest;
 import io.ballerina.flowmodelgenerator.extension.request.CopilotContextRequest;
 import io.ballerina.flowmodelgenerator.extension.request.EnclosedFuncDefRequest;
@@ -66,6 +65,7 @@ import io.ballerina.flowmodelgenerator.extension.response.FlowNodeDeleteResponse
 import io.ballerina.flowmodelgenerator.extension.response.FunctionDefinitionResponse;
 import io.ballerina.flowmodelgenerator.extension.response.SearchNodesResponse;
 import io.ballerina.modelgenerator.commons.CommonUtils;
+import io.ballerina.modelgenerator.commons.FileSystemUtils;
 import io.ballerina.modelgenerator.commons.ModuleInfo;
 import io.ballerina.modelgenerator.commons.PackageUtil;
 import io.ballerina.projects.Document;
@@ -667,7 +667,16 @@ public class FlowModelGeneratorService implements ExtendedLanguageServerService 
             try {
                 Path filePath = Path.of(request.filePath());
                 WorkspaceManager workspaceManager = this.workspaceManagerProxy.get();
-                Project project = workspaceManager.loadProject(filePath);
+                // Every search kind is scoped to the project rather than to the requested file, so the path only
+                // identifies the project to search in and the file need not exist on disk. Hence, resolve the project
+                // without requiring the file, instead of creating it. A connector search before connections.bal is
+                // created is one such case, but the relaxation is general and is not specific to that kind.
+                //
+                // A kind that uses the position now proceeds with a position pointing into a file that does not
+                // exist, instead of failing while the project is resolved. Such a position matches no node of the
+                // project, since the commands compare it against the line ranges of the existing sources, so it
+                // simply narrows nothing.
+                Project project = FileSystemUtils.resolveProject(workspaceManager, filePath);
                 SearchCommand.Kind searchKind = SearchCommand.Kind.valueOf(request.searchKind());
                 LineRange position = request.position();
                 if (request.position() != null) {
@@ -677,13 +686,17 @@ public class FlowModelGeneratorService implements ExtendedLanguageServerService 
                             request.position().endLine());
                 }
 
-                Path projectPath = workspaceManager.projectRoot(filePath);
+                // The source root is used instead of WorkspaceManager.projectRoot() since the latter cannot resolve
+                // the package root of a file that is absent on disk.
+                Path projectPath = project.sourceRoot();
                 Optional<Document> functionsDoc = getDocumentFromFile(projectPath, "functions.bal");
 
                 SearchCommand command = SearchCommand.from(searchKind, project, position, request.queryMap(),
                         functionsDoc.orElse(null));
                 JsonArray categories = command.execute();
-                if (request.position() != null) {
+                // A document cannot be resolved for a file that does not exist, and such a file has no test function
+                // to be inside of either.
+                if (request.position() != null && Files.exists(filePath)) {
                     Optional<Document> document = workspaceManager.document(filePath);
                     LinePosition cursorPosition = request.position().startLine();
                     if (document.isPresent() &&

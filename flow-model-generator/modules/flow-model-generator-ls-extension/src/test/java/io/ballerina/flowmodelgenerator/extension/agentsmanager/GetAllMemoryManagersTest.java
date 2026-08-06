@@ -61,7 +61,8 @@ public class GetAllMemoryManagersTest extends AbstractLSTest {
             TestConfig updatedConfig = new TestConfig(testConfig.source(), testConfig.orgName(),
                     testConfig.agent(), models);
 //            updateConfig(configJsonPath, updatedConfig);
-            Assert.fail("Test failed. Updated the expected output in " + configJsonPath);
+            Assert.fail(String.format("Failed test: '%s' Actual: `%s` Expected `%s`", configJsonPath,
+                    models, testConfig.models()));
         }
     }
 
