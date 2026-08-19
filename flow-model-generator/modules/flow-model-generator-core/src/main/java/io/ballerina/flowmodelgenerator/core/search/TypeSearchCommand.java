@@ -42,10 +42,12 @@ import io.ballerina.modelgenerator.commons.CommonUtils;
 import io.ballerina.modelgenerator.commons.PackageUtil;
 import io.ballerina.modelgenerator.commons.SearchResult;
 import io.ballerina.projects.Module;
+import io.ballerina.projects.ModuleDependency;
 import io.ballerina.projects.ModuleName;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageName;
 import io.ballerina.projects.Project;
+import io.ballerina.projects.ResolvedPackageDependency;
 import io.ballerina.projects.directory.BuildProject;
 import io.ballerina.projects.directory.WorkspaceProject;
 import io.ballerina.tools.text.LineRange;
@@ -54,10 +56,13 @@ import org.ballerinalang.langserver.common.utils.SymbolUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Represents a command to search for types within a module. This class extends SearchCommand and provides functionality
@@ -81,22 +86,23 @@ import java.util.Optional;
 class TypeSearchCommand extends SearchCommand {
 
     private final List<String> moduleNames;
+    private final Set<String> moduleNameSet;
 
     public TypeSearchCommand(Project project, LineRange position, Map<String, String> queryMap) {
         super(project, position, queryMap);
 
-        // Obtain the imported project names
+        // Collect dependencies from every module, not just the default one, so a connector imported only by a
+        // submodule isn't missed. TreeSet keeps the order stable across compilations.
         Package currentPackage = project.currentPackage();
         PackageUtil.getCompilation(currentPackage);
-        moduleNames = currentPackage.getDefaultModule().moduleDependencies().stream()
-                .map(moduleDependency -> {
-                    ModuleName name = moduleDependency.descriptor().name();
-                    if (Objects.nonNull(name.moduleNamePart()) && !name.moduleNamePart().isEmpty()) {
-                        return name.packageName().value() + "." + name.moduleNamePart();
-                    }
-                    return name.packageName().value();
-                })
-                .toList();
+        Set<String> importedModuleNames = new TreeSet<>();
+        for (Module module : currentPackage.modules()) {
+            for (ModuleDependency moduleDependency : module.moduleDependencies()) {
+                importedModuleNames.add(toModuleKey(moduleDependency.descriptor().name()));
+            }
+        }
+        moduleNames = List.copyOf(importedModuleNames);
+        moduleNameSet = importedModuleNames; // fast membership checks in buildLibraryNodes
     }
 
     @Override
@@ -108,6 +114,7 @@ class TypeSearchCommand extends SearchCommand {
         }
 
         buildLibraryNodes(searchResults);
+        buildLiveDependencyTypes();
         buildImportedLocalModules();
         return rootBuilder.build().items();
     }
@@ -117,8 +124,123 @@ class TypeSearchCommand extends SearchCommand {
         buildWorkspaceNodes();
         List<SearchResult> typeSearchList = dbManager.searchTypes(query, limit, offset);
         buildLibraryNodes(typeSearchList);
+        buildLiveDependencyTypes();
         buildImportedLocalModules();
         return rootBuilder.build().items();
+    }
+
+    /**
+     * Converts a {@link ModuleName} into the "packageName[.moduleNamePart]" key format used to identify modules
+     * throughout this class.
+     */
+    private static String toModuleKey(ModuleName name) {
+        return (Objects.nonNull(name.moduleNamePart()) && !name.moduleNamePart().isEmpty())
+                ? name.packageName().value() + "." + name.moduleNamePart()
+                : name.packageName().value();
+    }
+
+    /**
+     * Falls back to the compiled semantic model for dependency modules missing from the search index
+     * (e.g. a connector that was published recently and hasn't been indexed yet).
+     */
+    private void buildLiveDependencyTypes() {
+        if (moduleNames.isEmpty()) {
+            return;
+        }
+
+        // Unpaginated check - a module can be fully indexed but still miss the page if other modules filled it.
+        Set<String> indexedModuleNames = dbManager.findIndexedModuleNames(moduleNames);
+
+        Set<String> missingModuleNames = new HashSet<>();
+        for (String moduleName : moduleNames) {
+            if (!indexedModuleNames.contains(moduleName)) {
+                missingModuleNames.add(moduleName);
+            }
+        }
+        if (missingModuleNames.isEmpty()) {
+            return;
+        }
+
+        Package currentPackage = project.currentPackage();
+        if (currentPackage.getResolution() == null || currentPackage.getResolution().dependencyGraph() == null) {
+            return;
+        }
+
+        Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
+        for (ResolvedPackageDependency dependency : currentPackage.getResolution().dependencyGraph().getNodes()) {
+            Package dependencyPackage = dependency.packageInstance();
+            if (dependencyPackage == null) {
+                continue;
+            }
+            for (Module module : dependencyPackage.modules()) {
+                String moduleName = toModuleKey(module.moduleName());
+                if (missingModuleNames.contains(moduleName)) {
+                    buildLiveModuleTypes(module, moduleName, dependencyPackage, importedTypesBuilder);
+                }
+            }
+        }
+    }
+
+    private void buildLiveModuleTypes(Module module, String moduleName, Package dependencyPackage,
+                                       Category.Builder importedTypesBuilder) {
+        SemanticModel semanticModel;
+        try {
+            semanticModel = PackageUtil.getCompilation(module.packageInstance()).getSemanticModel(module.moduleId());
+        } catch (RuntimeException e) {
+            return; // no semantic model for generated/testonly modules
+        }
+        if (semanticModel == null) {
+            return;
+        }
+
+        String orgName = dependencyPackage.packageOrg().toString();
+        String packageName = dependencyPackage.packageName().toString();
+        String version = dependencyPackage.packageVersion().toString();
+
+        List<ScoredType> scoredTypes = new ArrayList<>();
+        for (Symbol symbol : semanticModel.moduleSymbols()) {
+            if (!(symbol instanceof TypeDefinitionSymbol) && !(symbol instanceof ClassSymbol)) {
+                continue;
+            }
+            if (!(symbol instanceof Qualifiable qualifiable) || !qualifiable.qualifiers().contains(Qualifier.PUBLIC)) {
+                continue;
+            }
+            // client classes are Connectors, not Types (mirrors SearchIndexGenerator's exclusion)
+            if (symbol instanceof ClassSymbol && qualifiable.qualifiers().contains(Qualifier.CLIENT)) {
+                continue;
+            }
+            if (symbol.getName().isEmpty()) {
+                continue;
+            }
+            String typeName = symbol.getName().get();
+            String description = "";
+            if (symbol instanceof Documentable documentable) {
+                Documentation documentation = documentable.documentation().orElse(null);
+                description = documentation != null ? documentation.description().orElse("") : "";
+            }
+            int score = RelevanceCalculator.calculateFuzzyRelevanceScore(typeName, description, query);
+            if (score > 0) {
+                scoredTypes.add(new ScoredType(symbol, typeName, description, score));
+            }
+        }
+        scoredTypes.sort(Comparator.comparingInt(ScoredType::score).reversed());
+
+        for (ScoredType scoredType : scoredTypes) {
+            Metadata metadata = new Metadata.Builder<>(null)
+                    .label(scoredType.typeName())
+                    .description(scoredType.description())
+                    .build();
+            Codedata codedata = new Codedata.Builder<>(null)
+                    .node(NodeKind.TYPEDESC)
+                    .org(orgName)
+                    .module(moduleName)
+                    .packageName(packageName)
+                    .symbol(scoredType.typeName())
+                    .version(version)
+                    .build();
+            importedTypesBuilder.stepIn(moduleName, "", List.of())
+                    .node(new AvailableNode(metadata, codedata, true));
+        }
     }
 
     @Override
@@ -280,7 +402,7 @@ class TypeSearchCommand extends SearchCommand {
                     .version(packageInfo.version())
                     .build();
             Category.Builder builder;
-            if (moduleNames.contains(packageInfo.moduleName())) {
+            if (moduleNameSet.contains(packageInfo.moduleName())) {
                 builder = importedTypesBuilder;
             } else {
                 builder = availableTypesBuilder;

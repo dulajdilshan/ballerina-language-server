@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -496,7 +497,7 @@ public class SearchDatabaseManager {
                     p.version AS package_version
                 FROM Type AS t
                 JOIN Package AS p ON t.package_id = p.id
-                ORDER BY t.name
+                ORDER BY t.name, p.name
                 LIMIT ?
                 OFFSET ?;
                 """;
@@ -516,7 +517,7 @@ public class SearchDatabaseManager {
                 JOIN Type AS t ON fts.rowid = t.id
                 JOIN Package AS p ON t.package_id = p.id
                 WHERE fts.TypeFTS MATCH ?
-                ORDER BY fts.rank
+                ORDER BY fts.rank, t.name, p.name
                 LIMIT ?
                 OFFSET ?;
                 """;
@@ -559,7 +560,8 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Searches for types that match the given package names.
+     * Searches for types that match the given package names. Each package is capped to a fair share of
+     * {@code limit} so one large package (e.g. {@code ai}) can't crowd out the others in the same request.
      *
      * @param packageNames List of package names to search in
      * @param limit        The maximum number of results to return
@@ -573,26 +575,24 @@ public class SearchDatabaseManager {
         }
         List<SearchResult> results = new ArrayList<>();
 
-        StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append("SELECT ")
-                .append("t.name AS type_name, ")
-                .append("t.description AS type_description, ")
-                .append("t.package_id, ")
-                .append("p.name AS module_name, ")
-                .append("p.package_name, ")
-                .append("p.org AS package_org, ")
-                .append("p.version AS package_version ")
-                .append("FROM Package p ")
-                .append("JOIN Type t ON p.id = t.package_id");
+        int perPackageLimit = Math.max(1, (limit + packageNames.size() - 1) / packageNames.size());
+        String packagePlaceholders = String.join(",", Collections.nCopies(packageNames.size(), "?"));
 
-        // Build the SQL query with IN clauses for packages
-        sqlBuilder.append(" WHERE p.name IN (")
-                .append(String.join(",", Collections.nCopies(packageNames.size(), "?")))
-                .append(")");
-        sqlBuilder.append(" LIMIT ? OFFSET ?");
+        String sql = "SELECT type_name, type_description, package_id, module_name, package_name, "
+                + "package_org, package_version FROM ("
+                + "  SELECT t.name AS type_name, t.description AS type_description, t.package_id, "
+                + "         p.name AS module_name, p.package_name, p.org AS package_org, "
+                + "         p.version AS package_version, "
+                + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name) AS rn "
+                + "  FROM Package p "
+                + "  JOIN Type t ON p.id = t.package_id "
+                + "  WHERE p.name IN (" + packagePlaceholders + ")"
+                + ") WHERE rn <= ? "
+                + "ORDER BY module_name, type_name "
+                + "LIMIT ? OFFSET ?";
 
         try (Connection conn = DriverManager.getConnection(dbPath);
-             PreparedStatement stmt = conn.prepareStatement(sqlBuilder.toString())) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             // Set parameters for package names
             int paramIndex = 1;
@@ -600,7 +600,8 @@ public class SearchDatabaseManager {
                 stmt.setString(paramIndex++, packageName);
             }
 
-            // Set limit and offset
+            // Set the per-package cap, then the overall limit and offset
+            stmt.setInt(paramIndex++, perPackageLimit);
             stmt.setInt(paramIndex++, limit);
             stmt.setInt(paramIndex, offset);
 
@@ -623,6 +624,47 @@ public class SearchDatabaseManager {
         }
 
         return results;
+    }
+
+    /**
+     * Returns which of the given module names have at least one indexed type. Unpaginated, unlike
+     * {@link #searchTypesByPackages}, so a module isn't misreported as missing just because paging cut it off.
+     *
+     * @param packageNames List of module names to check
+     * @return The subset of {@code packageNames} that have at least one indexed type
+     * @throws RuntimeException if there is an error executing the query
+     */
+    public Set<String> findIndexedModuleNames(List<String> packageNames) {
+        if (packageNames.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> indexedModuleNames = new HashSet<>();
+
+        String sql = "SELECT DISTINCT p.name AS module_name FROM Package p " +
+                "JOIN Type t ON p.id = t.package_id " +
+                "WHERE p.name IN (" +
+                String.join(",", Collections.nCopies(packageNames.size(), "?")) +
+                ")";
+
+        try (Connection conn = DriverManager.getConnection(dbPath);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            int paramIndex = 1;
+            for (String packageName : packageNames) {
+                stmt.setString(paramIndex++, packageName);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    indexedModuleNames.add(rs.getString("module_name"));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.severe("Error checking indexed module names: " + e.getMessage());
+            throw new RuntimeException("Failed to check indexed module names", e);
+        }
+
+        return indexedModuleNames;
     }
 
     /**
