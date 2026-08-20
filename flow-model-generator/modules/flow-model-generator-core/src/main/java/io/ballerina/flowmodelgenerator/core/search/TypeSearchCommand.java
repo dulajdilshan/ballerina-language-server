@@ -45,8 +45,8 @@ import io.ballerina.projects.Module;
 import io.ballerina.projects.ModuleDependency;
 import io.ballerina.projects.ModuleName;
 import io.ballerina.projects.Package;
+import io.ballerina.projects.PackageDependencyScope;
 import io.ballerina.projects.PackageName;
-import io.ballerina.projects.PlatformLibraryScope;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
 import io.ballerina.projects.directory.BuildProject;
@@ -113,8 +113,7 @@ class TypeSearchCommand extends SearchCommand {
     }
 
     private static boolean isDefaultScope(ModuleDependency moduleDependency) {
-        return moduleDependency.packageDependency().scope().getValue().equals(
-                PlatformLibraryScope.DEFAULT.getStringValue());
+        return moduleDependency.packageDependency().scope() == PackageDependencyScope.DEFAULT;
     }
 
     private static boolean isSamePackage(Package currentPackage, ModuleDependency moduleDependency) {
@@ -184,6 +183,11 @@ class TypeSearchCommand extends SearchCommand {
         }
 
         Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
+        // Shared across every missing module so the live fallback emits one globally paged window, consistent
+        // with the indexed path, instead of re-applying the full offset/limit to each module in turn.
+        PaginationWindow window = new PaginationWindow(offset, limit);
+        int resolvedCount = 0;
+        outer:
         for (ResolvedPackageDependency dependency : currentPackage.getResolution().dependencyGraph().getNodes()) {
             Package dependencyPackage = dependency.packageInstance();
             if (dependencyPackage == null) {
@@ -192,14 +196,35 @@ class TypeSearchCommand extends SearchCommand {
             for (Module module : dependencyPackage.modules()) {
                 String moduleName = toModuleKey(module.moduleName());
                 if (missingModuleNames.contains(moduleName)) {
-                    buildLiveModuleTypes(module, moduleName, dependencyPackage, importedTypesBuilder);
+                    buildLiveModuleTypes(module, moduleName, dependencyPackage, importedTypesBuilder, window);
+                    resolvedCount++;
+                    if (resolvedCount >= missingModuleNames.size()) {
+                        break outer;
+                    }
                 }
             }
         }
     }
 
+    /**
+     * Mutable offset/limit window shared across every module processed in a single {@link #buildLiveDependencyTypes()}
+     * call, so live fallback results are paged as one combined window rather than per module.
+     */
+    private static final class PaginationWindow {
+        private int remainingToSkip;
+        private int remainingLimit;
+
+        private PaginationWindow(int offset, int limit) {
+            this.remainingToSkip = offset;
+            this.remainingLimit = limit;
+        }
+    }
+
     private void buildLiveModuleTypes(Module module, String moduleName, Package dependencyPackage,
-                                       Category.Builder importedTypesBuilder) {
+                                       Category.Builder importedTypesBuilder, PaginationWindow window) {
+        if (window.remainingLimit <= 0) {
+            return;
+        }
         SemanticModel semanticModel;
         try {
             semanticModel = PackageUtil.getCompilation(module.packageInstance()).getSemanticModel(module.moduleId());
@@ -244,14 +269,12 @@ class TypeSearchCommand extends SearchCommand {
                 .thenComparing(ScoredType::typeName));
 
         String icon = CommonUtils.generateIcon(orgName, packageName, version);
-        int remainingToSkip = offset;
-        int added = 0;
         for (ScoredType scoredType : scoredTypes) {
-            if (remainingToSkip > 0) {
-                remainingToSkip--;
+            if (window.remainingToSkip > 0) {
+                window.remainingToSkip--;
                 continue;
             }
-            if (added >= limit) {
+            if (window.remainingLimit <= 0) {
                 break;
             }
             Metadata metadata = new Metadata.Builder<>(null)
@@ -269,7 +292,7 @@ class TypeSearchCommand extends SearchCommand {
                     .build();
             importedTypesBuilder.stepIn(moduleName, "", List.of())
                     .node(new AvailableNode(metadata, codedata, true));
-            added++;
+            window.remainingLimit--;
         }
     }
 

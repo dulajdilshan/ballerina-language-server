@@ -583,7 +583,6 @@ public class SearchDatabaseManager {
         List<SearchResult> results = new ArrayList<>();
 
         int window = offset + limit;
-        Map<String, Integer> quotas = computeFairShareQuotas(distinctPackageNames, window);
         String packagePlaceholders = String.join(",", Collections.nCopies(distinctPackageNames.size(), "?"));
         String quotaValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?)"));
 
@@ -602,31 +601,34 @@ public class SearchDatabaseManager {
                 + "ORDER BY module_name, type_name "
                 + "LIMIT ? OFFSET ?";
 
-        try (Connection conn = DriverManager.getConnection(dbPath);
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DriverManager.getConnection(dbPath)) {
+            Map<String, Integer> quotas = computeFairShareQuotas(conn, distinctPackageNames, window);
 
-            int paramIndex = 1;
-            for (String packageName : distinctPackageNames) {
-                stmt.setString(paramIndex++, packageName);
-                stmt.setInt(paramIndex++, quotas.getOrDefault(packageName, 0));
-            }
-            for (String packageName : distinctPackageNames) {
-                stmt.setString(paramIndex++, packageName);
-            }
-            stmt.setInt(paramIndex++, limit);
-            stmt.setInt(paramIndex, offset);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                int paramIndex = 1;
+                for (String packageName : distinctPackageNames) {
+                    stmt.setString(paramIndex++, packageName);
+                    stmt.setInt(paramIndex++, quotas.getOrDefault(packageName, 0));
+                }
+                for (String packageName : distinctPackageNames) {
+                    stmt.setString(paramIndex++, packageName);
+                }
+                stmt.setInt(paramIndex++, limit);
+                stmt.setInt(paramIndex, offset);
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    String name = rs.getString("type_name");
-                    String description = rs.getString("type_description");
-                    String org = rs.getString("package_org");
-                    String moduleName = rs.getString("module_name");
-                    String pkgName = rs.getString("package_name");
-                    String version = rs.getString("package_version");
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        String name = rs.getString("type_name");
+                        String description = rs.getString("type_description");
+                        String org = rs.getString("package_org");
+                        String moduleName = rs.getString("module_name");
+                        String pkgName = rs.getString("package_name");
+                        String version = rs.getString("package_version");
 
-                    SearchResult.Package packageInfo = new SearchResult.Package(org, pkgName, moduleName, version);
-                    results.add(SearchResult.from(packageInfo, name, description));
+                        SearchResult.Package packageInfo =
+                                new SearchResult.Package(org, pkgName, moduleName, version);
+                        results.add(SearchResult.from(packageInfo, name, description));
+                    }
                 }
             }
         } catch (SQLException e) {
@@ -642,13 +644,14 @@ public class SearchDatabaseManager {
      * packages are visited from the fewest available types to the most, each taking the smaller of its actual
      * count and an equal share of what's left, so slack from small packages carries over to larger ones.
      */
-    private Map<String, Integer> computeFairShareQuotas(List<String> packageNames, int window) {
-        Map<String, Integer> counts = fetchPerPackageTypeCounts(packageNames);
+    private Map<String, Integer> computeFairShareQuotas(Connection conn, List<String> packageNames, int window)
+            throws SQLException {
+        Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, packageNames);
         List<Map.Entry<String, Integer>> entries = new ArrayList<>(counts.entrySet());
         entries.sort(Map.Entry.comparingByValue());
 
         Map<String, Integer> quotas = new HashMap<>();
-        int remainingWindow = window;
+        int remainingWindow = Math.max(window, 0);
         int remainingPackages = entries.size();
         for (Map.Entry<String, Integer> entry : entries) {
             int fairShare = (remainingWindow + remainingPackages - 1) / remainingPackages;
@@ -663,7 +666,8 @@ public class SearchDatabaseManager {
     /**
      * Returns the number of indexed types available per package name, with {@code 0} for names with no rows.
      */
-    private Map<String, Integer> fetchPerPackageTypeCounts(List<String> packageNames) {
+    private Map<String, Integer> fetchPerPackageTypeCounts(Connection conn, List<String> packageNames)
+            throws SQLException {
         Map<String, Integer> counts = new HashMap<>();
         for (String packageName : packageNames) {
             counts.put(packageName, 0);
@@ -675,9 +679,7 @@ public class SearchDatabaseManager {
                 + "WHERE p.name IN (" + packagePlaceholders + ") "
                 + "GROUP BY p.name";
 
-        try (Connection conn = DriverManager.getConnection(dbPath);
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             int paramIndex = 1;
             for (String packageName : packageNames) {
                 stmt.setString(paramIndex++, packageName);
@@ -688,9 +690,6 @@ public class SearchDatabaseManager {
                     counts.put(rs.getString("module_name"), rs.getInt("type_count"));
                 }
             }
-        } catch (SQLException e) {
-            LOGGER.severe("Error counting types per package: " + e.getMessage());
-            throw new RuntimeException("Failed to count types per package", e);
         }
 
         return counts;
