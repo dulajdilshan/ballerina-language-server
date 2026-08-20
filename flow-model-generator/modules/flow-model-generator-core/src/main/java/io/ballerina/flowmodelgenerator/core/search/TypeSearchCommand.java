@@ -46,6 +46,7 @@ import io.ballerina.projects.ModuleDependency;
 import io.ballerina.projects.ModuleName;
 import io.ballerina.projects.Package;
 import io.ballerina.projects.PackageName;
+import io.ballerina.projects.PlatformLibraryScope;
 import io.ballerina.projects.Project;
 import io.ballerina.projects.ResolvedPackageDependency;
 import io.ballerina.projects.directory.BuildProject;
@@ -92,17 +93,33 @@ class TypeSearchCommand extends SearchCommand {
         super(project, position, queryMap);
 
         // Collect dependencies from every module, not just the default one, so a connector imported only by a
-        // submodule isn't missed. TreeSet keeps the order stable across compilations.
+        // submodule isn't missed. TreeSet keeps the order stable across compilations. Same-package and non-default
+        // scope (e.g. testonly) dependencies are excluded: the former are already surfaced by
+        // buildImportedLocalModules and would otherwise be emitted twice; the latter aren't real imported
+        // dependencies of the integration.
         Package currentPackage = project.currentPackage();
         PackageUtil.getCompilation(currentPackage);
         Set<String> importedModuleNames = new TreeSet<>();
         for (Module module : currentPackage.modules()) {
             for (ModuleDependency moduleDependency : module.moduleDependencies()) {
+                if (!isDefaultScope(moduleDependency) || isSamePackage(currentPackage, moduleDependency)) {
+                    continue;
+                }
                 importedModuleNames.add(toModuleKey(moduleDependency.descriptor().name()));
             }
         }
         moduleNames = List.copyOf(importedModuleNames);
         moduleNameSet = importedModuleNames; // fast membership checks in buildLibraryNodes
+    }
+
+    private static boolean isDefaultScope(ModuleDependency moduleDependency) {
+        return moduleDependency.packageDependency().scope().getValue().equals(
+                PlatformLibraryScope.DEFAULT.getStringValue());
+    }
+
+    private static boolean isSamePackage(Package currentPackage, ModuleDependency moduleDependency) {
+        return moduleDependency.descriptor().org().value().equals(currentPackage.packageOrg().value())
+                && moduleDependency.descriptor().packageName().value().equals(currentPackage.packageName().value());
     }
 
     @Override
@@ -223,8 +240,10 @@ class TypeSearchCommand extends SearchCommand {
                 scoredTypes.add(new ScoredType(symbol, typeName, description, score));
             }
         }
-        scoredTypes.sort(Comparator.comparingInt(ScoredType::score).reversed());
+        scoredTypes.sort(Comparator.comparingInt(ScoredType::score).reversed()
+                .thenComparing(ScoredType::typeName));
 
+        String icon = CommonUtils.generateIcon(orgName, packageName, version);
         int remainingToSkip = offset;
         int added = 0;
         for (ScoredType scoredType : scoredTypes) {
@@ -238,6 +257,7 @@ class TypeSearchCommand extends SearchCommand {
             Metadata metadata = new Metadata.Builder<>(null)
                     .label(scoredType.typeName())
                     .description(scoredType.description())
+                    .icon(icon)
                     .build();
             Codedata codedata = new Codedata.Builder<>(null)
                     .node(NodeKind.TYPEDESC)

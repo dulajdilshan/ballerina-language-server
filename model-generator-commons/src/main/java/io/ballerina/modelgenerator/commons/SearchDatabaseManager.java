@@ -29,8 +29,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -560,9 +563,11 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Searches for types that match the given package names. Each package is capped to a fair share of the
-     * {@code offset + limit} window so one large package (e.g. {@code ai}) can't crowd out the others, while still
-     * retaining enough rows per package for pagination beyond the first page.
+     * Searches for types that match the given package names. Each package's row budget is computed with a
+     * water-filling allocation over the {@code offset + limit} window: packages with fewer available types than
+     * their equal share give their unused budget back to the remaining packages, so one large package
+     * (e.g. {@code ai}) can't crowd out the others, but no budget is wasted either when a package has few or no
+     * matching rows.
      *
      * @param packageNames List of package names to search in
      * @param limit        The maximum number of results to return
@@ -574,36 +579,40 @@ public class SearchDatabaseManager {
         if (packageNames.isEmpty()) {
             return Collections.emptyList();
         }
+        List<String> distinctPackageNames = List.copyOf(new LinkedHashSet<>(packageNames));
         List<SearchResult> results = new ArrayList<>();
 
         int window = offset + limit;
-        int perPackageLimit = Math.max(1, (window + packageNames.size() - 1) / packageNames.size());
-        String packagePlaceholders = String.join(",", Collections.nCopies(packageNames.size(), "?"));
+        Map<String, Integer> quotas = computeFairShareQuotas(distinctPackageNames, window);
+        String packagePlaceholders = String.join(",", Collections.nCopies(distinctPackageNames.size(), "?"));
+        String quotaValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?)"));
 
         String sql = "SELECT type_name, type_description, package_id, module_name, package_name, "
                 + "package_org, package_version FROM ("
                 + "  SELECT t.name AS type_name, t.description AS type_description, t.package_id, "
                 + "         p.name AS module_name, p.package_name, p.org AS package_org, "
-                + "         p.version AS package_version, "
+                + "         p.version AS package_version, q.pkg_cap AS pkg_cap, "
                 + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name) AS rn "
                 + "  FROM Package p "
                 + "  JOIN Type t ON p.id = t.package_id "
+                + "  JOIN (SELECT column1 AS pkg_name, column2 AS pkg_cap FROM (VALUES " + quotaValuesClause + ")) "
+                + "AS q ON q.pkg_name = p.name "
                 + "  WHERE p.name IN (" + packagePlaceholders + ")"
-                + ") WHERE rn <= ? "
+                + ") WHERE rn <= pkg_cap "
                 + "ORDER BY module_name, type_name "
                 + "LIMIT ? OFFSET ?";
 
         try (Connection conn = DriverManager.getConnection(dbPath);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            // Set parameters for package names
             int paramIndex = 1;
-            for (String packageName : packageNames) {
+            for (String packageName : distinctPackageNames) {
+                stmt.setString(paramIndex++, packageName);
+                stmt.setInt(paramIndex++, quotas.getOrDefault(packageName, 0));
+            }
+            for (String packageName : distinctPackageNames) {
                 stmt.setString(paramIndex++, packageName);
             }
-
-            // Set the per-package cap, then the overall limit and offset
-            stmt.setInt(paramIndex++, perPackageLimit);
             stmt.setInt(paramIndex++, limit);
             stmt.setInt(paramIndex, offset);
 
@@ -629,11 +638,73 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Returns which of the given module names have at least one indexed type. Unpaginated, unlike
+     * Computes a max-min fair per-package row quota for {@code packageNames} within the given {@code window}:
+     * packages are visited from the fewest available types to the most, each taking the smaller of its actual
+     * count and an equal share of what's left, so slack from small packages carries over to larger ones.
+     */
+    private Map<String, Integer> computeFairShareQuotas(List<String> packageNames, int window) {
+        Map<String, Integer> counts = fetchPerPackageTypeCounts(packageNames);
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>(counts.entrySet());
+        entries.sort(Map.Entry.comparingByValue());
+
+        Map<String, Integer> quotas = new HashMap<>();
+        int remainingWindow = window;
+        int remainingPackages = entries.size();
+        for (Map.Entry<String, Integer> entry : entries) {
+            int fairShare = (remainingWindow + remainingPackages - 1) / remainingPackages;
+            int quota = Math.min(entry.getValue(), fairShare);
+            quotas.put(entry.getKey(), quota);
+            remainingWindow -= quota;
+            remainingPackages--;
+        }
+        return quotas;
+    }
+
+    /**
+     * Returns the number of indexed types available per package name, with {@code 0} for names with no rows.
+     */
+    private Map<String, Integer> fetchPerPackageTypeCounts(List<String> packageNames) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (String packageName : packageNames) {
+            counts.put(packageName, 0);
+        }
+
+        String packagePlaceholders = String.join(",", Collections.nCopies(packageNames.size(), "?"));
+        String sql = "SELECT p.name AS module_name, COUNT(*) AS type_count FROM Package p "
+                + "JOIN Type t ON p.id = t.package_id "
+                + "WHERE p.name IN (" + packagePlaceholders + ") "
+                + "GROUP BY p.name";
+
+        try (Connection conn = DriverManager.getConnection(dbPath);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            int paramIndex = 1;
+            for (String packageName : packageNames) {
+                stmt.setString(paramIndex++, packageName);
+            }
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    counts.put(rs.getString("module_name"), rs.getInt("type_count"));
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.severe("Error counting types per package: " + e.getMessage());
+            throw new RuntimeException("Failed to count types per package", e);
+        }
+
+        return counts;
+    }
+
+    /**
+     * Returns which of the given module names are indexed, i.e. present in the {@code Package} table - regardless
+     * of whether they happen to have any {@code Type} rows. A module can be legitimately indexed with zero types
+     * (e.g. {@code ballerina/lang.float}); such a module must still count as indexed here, otherwise it's
+     * misreported as missing and forces a full live compilation on every request. Unpaginated, unlike
      * {@link #searchTypesByPackages}, so a module isn't misreported as missing just because paging cut it off.
      *
      * @param packageNames List of module names to check
-     * @return The subset of {@code packageNames} that have at least one indexed type
+     * @return The subset of {@code packageNames} present in the index
      * @throws RuntimeException if there is an error executing the query
      */
     public Set<String> findIndexedModuleNames(List<String> packageNames) {
@@ -643,7 +714,6 @@ public class SearchDatabaseManager {
         Set<String> indexedModuleNames = new HashSet<>();
 
         String sql = "SELECT DISTINCT p.name AS module_name FROM Package p " +
-                "JOIN Type t ON p.id = t.package_id " +
                 "WHERE p.name IN (" +
                 String.join(",", Collections.nCopies(packageNames.size(), "?")) +
                 ")";
