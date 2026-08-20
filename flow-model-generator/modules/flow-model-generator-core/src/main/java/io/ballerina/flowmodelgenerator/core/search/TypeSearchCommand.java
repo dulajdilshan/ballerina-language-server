@@ -225,7 +225,16 @@ class TypeSearchCommand extends SearchCommand {
         }
         scoredTypes.sort(Comparator.comparingInt(ScoredType::score).reversed());
 
+        int remainingToSkip = offset;
+        int added = 0;
         for (ScoredType scoredType : scoredTypes) {
+            if (remainingToSkip > 0) {
+                remainingToSkip--;
+                continue;
+            }
+            if (added >= limit) {
+                break;
+            }
             Metadata metadata = new Metadata.Builder<>(null)
                     .label(scoredType.typeName())
                     .description(scoredType.description())
@@ -240,6 +249,7 @@ class TypeSearchCommand extends SearchCommand {
                     .build();
             importedTypesBuilder.stepIn(moduleName, "", List.of())
                     .node(new AvailableNode(metadata, codedata, true));
+            added++;
         }
     }
 

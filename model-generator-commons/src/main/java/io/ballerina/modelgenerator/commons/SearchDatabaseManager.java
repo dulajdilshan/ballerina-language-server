@@ -560,8 +560,9 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Searches for types that match the given package names. Each package is capped to a fair share of
-     * {@code limit} so one large package (e.g. {@code ai}) can't crowd out the others in the same request.
+     * Searches for types that match the given package names. Each package is capped to a fair share of the
+     * {@code offset + limit} window so one large package (e.g. {@code ai}) can't crowd out the others, while still
+     * retaining enough rows per package for pagination beyond the first page.
      *
      * @param packageNames List of package names to search in
      * @param limit        The maximum number of results to return
@@ -575,7 +576,8 @@ public class SearchDatabaseManager {
         }
         List<SearchResult> results = new ArrayList<>();
 
-        int perPackageLimit = Math.max(1, (limit + packageNames.size() - 1) / packageNames.size());
+        int window = offset + limit;
+        int perPackageLimit = Math.max(1, (window + packageNames.size() - 1) / packageNames.size());
         String packagePlaceholders = String.join(",", Collections.nCopies(packageNames.size(), "?"));
 
         String sql = "SELECT type_name, type_description, package_id, module_name, package_name, "
