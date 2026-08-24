@@ -563,11 +563,11 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Searches for types that match the given package names. Each package's row budget is computed with a
-     * water-filling allocation over the {@code offset + limit} window: packages with fewer available types than
-     * their equal share give their unused budget back to the remaining packages, so one large package
-     * (e.g. {@code ai}) can't crowd out the others, but no budget is wasted either when a package has few or no
-     * matching rows.
+     * Searches for types that match the given package names, using a water-filling fair-share allocation per
+     * package so one large package can't crowd out the others. Each package's row range is derived from the
+     * quota at {@code offset} (its skip) and at {@code offset + limit} (its skip + take), rather than a single
+     * global {@code LIMIT}/{@code OFFSET} over a window-wide cap, so consecutive pages don't duplicate or skip
+     * rows when a later page's larger window shifts the per-package caps.
      *
      * @param packageNames List of package names to search in
      * @param limit        The maximum number of results to return
@@ -582,39 +582,40 @@ public class SearchDatabaseManager {
         List<String> distinctPackageNames = List.copyOf(new LinkedHashSet<>(packageNames));
         List<SearchResult> results = new ArrayList<>();
 
-        int window = offset + limit;
         String packagePlaceholders = String.join(",", Collections.nCopies(distinctPackageNames.size(), "?"));
-        String quotaValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?)"));
+        String rangeValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?,?)"));
 
         String sql = "SELECT type_name, type_description, package_id, module_name, package_name, "
                 + "package_org, package_version FROM ("
                 + "  SELECT t.name AS type_name, t.description AS type_description, t.package_id, "
                 + "         p.name AS module_name, p.package_name, p.org AS package_org, "
-                + "         p.version AS package_version, q.pkg_cap AS pkg_cap, "
+                + "         p.version AS package_version, q.pkg_skip AS pkg_skip, q.pkg_take AS pkg_take, "
                 + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name) AS rn "
                 + "  FROM Package p "
                 + "  JOIN Type t ON p.id = t.package_id "
-                + "  JOIN (SELECT column1 AS pkg_name, column2 AS pkg_cap FROM (VALUES " + quotaValuesClause + ")) "
-                + "AS q ON q.pkg_name = p.name "
+                + "  JOIN (SELECT column1 AS pkg_name, column2 AS pkg_skip, column3 AS pkg_take "
+                + "        FROM (VALUES " + rangeValuesClause + ")) AS q ON q.pkg_name = p.name "
                 + "  WHERE p.name IN (" + packagePlaceholders + ")"
-                + ") WHERE rn <= pkg_cap "
-                + "ORDER BY module_name, type_name "
-                + "LIMIT ? OFFSET ?";
+                + ") WHERE rn > pkg_skip AND rn <= pkg_skip + pkg_take "
+                + "ORDER BY module_name, type_name";
 
         try (Connection conn = DriverManager.getConnection(dbPath)) {
-            Map<String, Integer> quotas = computeFairShareQuotas(conn, distinctPackageNames, window);
+            Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, distinctPackageNames);
+            Map<String, Integer> startQuotas = computeFairShareQuotas(counts, offset);
+            Map<String, Integer> endQuotas = computeFairShareQuotas(counts, offset + limit);
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 int paramIndex = 1;
                 for (String packageName : distinctPackageNames) {
+                    int skip = startQuotas.getOrDefault(packageName, 0);
+                    int take = endQuotas.getOrDefault(packageName, 0) - skip;
                     stmt.setString(paramIndex++, packageName);
-                    stmt.setInt(paramIndex++, quotas.getOrDefault(packageName, 0));
+                    stmt.setInt(paramIndex++, skip);
+                    stmt.setInt(paramIndex++, take);
                 }
                 for (String packageName : distinctPackageNames) {
                     stmt.setString(paramIndex++, packageName);
                 }
-                stmt.setInt(paramIndex++, limit);
-                stmt.setInt(paramIndex, offset);
 
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
@@ -640,13 +641,12 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Computes a max-min fair per-package row quota for {@code packageNames} within the given {@code window}:
-     * packages are visited from the fewest available types to the most, each taking the smaller of its actual
-     * count and an equal share of what's left, so slack from small packages carries over to larger ones.
+     * Computes a max-min fair per-package row quota within the given {@code window}: packages are visited from
+     * the fewest available types to the most, each taking the smaller of its actual count and an equal share of
+     * what's left, so slack from small packages carries over to larger ones. Quotas only grow as {@code window}
+     * grows, which {@link #searchTypesByPackages} relies on for consistent paging.
      */
-    private Map<String, Integer> computeFairShareQuotas(Connection conn, List<String> packageNames, int window)
-            throws SQLException {
-        Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, packageNames);
+    private Map<String, Integer> computeFairShareQuotas(Map<String, Integer> counts, int window) {
         List<Map.Entry<String, Integer>> entries = new ArrayList<>(counts.entrySet());
         entries.sort(Map.Entry.comparingByValue());
 
