@@ -244,7 +244,9 @@ class TypeSearchCommand extends SearchCommand {
             if (!(symbol instanceof TypeDefinitionSymbol) && !(symbol instanceof ClassSymbol)) {
                 continue;
             }
-            if (!(symbol instanceof Qualifiable qualifiable) || !qualifiable.qualifiers().contains(Qualifier.PUBLIC)) {
+            // symbol is guaranteed Qualifiable here: both TypeDefinitionSymbol and ClassSymbol implement it
+            Qualifiable qualifiable = (Qualifiable) symbol;
+            if (!qualifiable.qualifiers().contains(Qualifier.PUBLIC)) {
                 continue;
             }
             // client classes are Connectors, not Types (mirrors SearchIndexGenerator's exclusion)
