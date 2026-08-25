@@ -157,8 +157,8 @@ class TypeSearchCommand extends SearchCommand {
             searchResults.addAll(dbManager.searchTypesByPackages(moduleNames, limit, offset));
         }
 
-        buildLibraryNodes(searchResults);
-        buildLiveDependencyTypes();
+        int importedCount = buildLibraryNodes(searchResults);
+        buildLiveDependencyTypes(importedCount);
         buildImportedLocalModules();
         return rootBuilder.build().items();
     }
@@ -167,8 +167,8 @@ class TypeSearchCommand extends SearchCommand {
     protected List<Item> search() {
         buildWorkspaceNodes();
         List<SearchResult> typeSearchList = dbManager.searchTypes(query, limit, offset);
-        buildLibraryNodes(typeSearchList);
-        buildLiveDependencyTypes();
+        int importedCount = buildLibraryNodes(typeSearchList);
+        buildLiveDependencyTypes(importedCount);
         buildImportedLocalModules();
         return rootBuilder.build().items();
     }
@@ -188,9 +188,16 @@ class TypeSearchCommand extends SearchCommand {
      * (e.g. a connector that was published recently and hasn't been indexed yet). Matches from every missing
      * module are ranked together before paging, so a strong match in one module isn't pushed to a later page by
      * weaker matches from a module visited earlier.
+     *
+     * @param consumedFromIndexed how many {@code IMPORTED_TYPES} slots the indexed results already filled this page
      */
-    private void buildLiveDependencyTypes() {
+    private void buildLiveDependencyTypes(int consumedFromIndexed) {
         if (moduleNames.isEmpty()) {
+            return;
+        }
+
+        int remainingLimit = limit - consumedFromIndexed;
+        if (remainingLimit <= 0) {
             return;
         }
 
@@ -242,7 +249,6 @@ class TypeSearchCommand extends SearchCommand {
 
         Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
         int remainingToSkip = offset;
-        int remainingLimit = limit;
         for (LiveTypeMatch match : allMatches) {
             if (remainingToSkip > 0) {
                 remainingToSkip--;
@@ -468,11 +474,15 @@ class TypeSearchCommand extends SearchCommand {
         projectBuilder.items(availableNodes);
     }
 
-    private void buildLibraryNodes(List<SearchResult> typeSearchList) {
+    /**
+     * @return the number of entries routed to {@code IMPORTED_TYPES}
+     */
+    private int buildLibraryNodes(List<SearchResult> typeSearchList) {
         // Set the categories based on available flags
         Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
         Category.Builder availableTypesBuilder = rootBuilder.stepIn(Category.Name.STANDARD_LIBRARY);
 
+        int importedCount = 0;
         // Add the library types
         for (SearchResult searchResult : typeSearchList) {
             SearchResult.Package packageInfo = searchResult.packageInfo();
@@ -495,6 +505,7 @@ class TypeSearchCommand extends SearchCommand {
             Category.Builder builder;
             if (moduleNameSet.contains(packageInfo.moduleName())) {
                 builder = importedTypesBuilder;
+                importedCount++;
             } else {
                 builder = availableTypesBuilder;
             }
@@ -503,6 +514,7 @@ class TypeSearchCommand extends SearchCommand {
                         .node(new AvailableNode(metadata, codedata, true));
             }
         }
+        return importedCount;
     }
 
     private void buildImportedLocalModules() {
