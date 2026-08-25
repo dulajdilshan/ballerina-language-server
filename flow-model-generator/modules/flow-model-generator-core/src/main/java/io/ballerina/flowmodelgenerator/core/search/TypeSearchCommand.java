@@ -57,6 +57,7 @@ import org.ballerinalang.langserver.common.utils.SymbolUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -88,28 +89,33 @@ class TypeSearchCommand extends SearchCommand {
 
     private final List<String> moduleNames;
     private final Set<String> moduleNameSet;
+    private final Map<String, String> moduleOrgByName;
 
     public TypeSearchCommand(Project project, LineRange position, Map<String, String> queryMap) {
         super(project, position, queryMap);
 
         // Collect dependencies from every module, not just the default one, so a connector imported only by a
-        // submodule isn't missed. TreeSet keeps the order stable across compilations. Same-package and non-default
-        // scope (e.g. testonly) dependencies are excluded: the former are already surfaced by
-        // buildImportedLocalModules and would otherwise be emitted twice; the latter aren't real imported
-        // dependencies of the integration.
+        // submodule isn't missed. TreeSet keeps the order stable across compilations. Same-package and workspace
+        // sibling dependencies are excluded: those are already surfaced by buildWorkspaceNodes/
+        // buildImportedLocalModules and would otherwise be emitted twice; non-default scope (e.g. testonly)
+        // dependencies aren't real imported dependencies of the integration.
         Package currentPackage = project.currentPackage();
         PackageUtil.getCompilation(currentPackage);
         Set<String> importedModuleNames = new TreeSet<>();
+        Map<String, String> orgByModuleName = new HashMap<>();
         for (Module module : currentPackage.modules()) {
             for (ModuleDependency moduleDependency : module.moduleDependencies()) {
-                if (!isDefaultScope(moduleDependency) || isSamePackage(currentPackage, moduleDependency)) {
+                if (!isDefaultScope(moduleDependency) || isWorkspaceMember(project, currentPackage, moduleDependency)) {
                     continue;
                 }
-                importedModuleNames.add(toModuleKey(moduleDependency.descriptor().name()));
+                String moduleKey = toModuleKey(moduleDependency.descriptor().name());
+                importedModuleNames.add(moduleKey);
+                orgByModuleName.put(moduleKey, moduleDependency.descriptor().org().value());
             }
         }
         moduleNames = List.copyOf(importedModuleNames);
         moduleNameSet = importedModuleNames; // fast membership checks in buildLibraryNodes
+        moduleOrgByName = Map.copyOf(orgByModuleName);
     }
 
     private static boolean isDefaultScope(ModuleDependency moduleDependency) {
@@ -119,6 +125,28 @@ class TypeSearchCommand extends SearchCommand {
     private static boolean isSamePackage(Package currentPackage, ModuleDependency moduleDependency) {
         return moduleDependency.descriptor().org().value().equals(currentPackage.packageOrg().value())
                 && moduleDependency.descriptor().packageName().value().equals(currentPackage.packageName().value());
+    }
+
+    /**
+     * Returns true if the dependency resolves to the current package or to another package in the same
+     * {@link WorkspaceProject}. Workspace siblings are already listed under {@code CURRENT_WORKSPACE} by
+     * {@link #buildWorkspaceNodes()}, so treating them as "imported" here would emit their types twice.
+     */
+    private static boolean isWorkspaceMember(Project project, Package currentPackage,
+                                              ModuleDependency moduleDependency) {
+        if (isSamePackage(currentPackage, moduleDependency)) {
+            return true;
+        }
+        Optional<WorkspaceProject> workspaceProject = project.workspaceProject();
+        if (workspaceProject.isEmpty()) {
+            return false;
+        }
+        for (BuildProject siblingProject : workspaceProject.get().projects()) {
+            if (isSamePackage(siblingProject.currentPackage(), moduleDependency)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -157,7 +185,9 @@ class TypeSearchCommand extends SearchCommand {
 
     /**
      * Falls back to the compiled semantic model for dependency modules missing from the search index
-     * (e.g. a connector that was published recently and hasn't been indexed yet).
+     * (e.g. a connector that was published recently and hasn't been indexed yet). Matches from every missing
+     * module are ranked together before paging, so a strong match in one module isn't pushed to a later page by
+     * weaker matches from a module visited earlier.
      */
     private void buildLiveDependencyTypes() {
         if (moduleNames.isEmpty()) {
@@ -165,7 +195,7 @@ class TypeSearchCommand extends SearchCommand {
         }
 
         // Unpaginated check - a module can be fully indexed but still miss the page if other modules filled it.
-        Set<String> indexedModuleNames = dbManager.findIndexedModuleNames(moduleNames);
+        Set<String> indexedModuleNames = dbManager.findIndexedModuleNames(moduleOrgByName);
 
         Set<String> missingModuleNames = new HashSet<>();
         for (String moduleName : moduleNames) {
@@ -182,64 +212,97 @@ class TypeSearchCommand extends SearchCommand {
             return;
         }
 
-        Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
-        // Shared across every missing module so the live fallback emits one globally paged window, consistent
-        // with the indexed path, instead of re-applying the full offset/limit to each module in turn.
-        PaginationWindow window = new PaginationWindow(offset, limit);
-        int resolvedCount = 0;
+        // getNodes() returns a HashMap keySet ordered by a UUID-derived hash, so it's not stable across
+        // re-resolutions; sort via ResolvedPackageDependency's natural (descriptor-based) order instead.
+        List<ResolvedPackageDependency> sortedDependencies =
+                new ArrayList<>(currentPackage.getResolution().dependencyGraph().getNodes());
+        Collections.sort(sortedDependencies);
+
+        List<LiveTypeMatch> allMatches = new ArrayList<>();
+        Set<String> resolvedModuleNames = new HashSet<>();
         outer:
-        for (ResolvedPackageDependency dependency : currentPackage.getResolution().dependencyGraph().getNodes()) {
+        for (ResolvedPackageDependency dependency : sortedDependencies) {
             Package dependencyPackage = dependency.packageInstance();
             if (dependencyPackage == null) {
                 continue;
             }
             for (Module module : dependencyPackage.modules()) {
                 String moduleName = toModuleKey(module.moduleName());
-                if (missingModuleNames.contains(moduleName)) {
-                    buildLiveModuleTypes(module, moduleName, dependencyPackage, importedTypesBuilder, window);
-                    resolvedCount++;
-                    if (resolvedCount >= missingModuleNames.size()) {
+                if (missingModuleNames.contains(moduleName) && resolvedModuleNames.add(moduleName)) {
+                    allMatches.addAll(collectLiveModuleTypes(module, moduleName, dependencyPackage));
+                    if (resolvedModuleNames.size() >= missingModuleNames.size()) {
                         break outer;
                     }
                 }
             }
         }
+
+        allMatches.sort(Comparator.comparingInt(LiveTypeMatch::score).reversed()
+                .thenComparing(LiveTypeMatch::typeName));
+
+        Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
+        int remainingToSkip = offset;
+        int remainingLimit = limit;
+        for (LiveTypeMatch match : allMatches) {
+            if (remainingToSkip > 0) {
+                remainingToSkip--;
+                continue;
+            }
+            if (remainingLimit <= 0) {
+                break;
+            }
+            String icon = CommonUtils.generateIcon(match.orgName(), match.packageName(), match.version());
+            Metadata metadata = new Metadata.Builder<>(null)
+                    .label(match.typeName())
+                    .description(match.description())
+                    .icon(icon)
+                    .build();
+            Codedata codedata = new Codedata.Builder<>(null)
+                    .node(NodeKind.TYPEDESC)
+                    .org(match.orgName())
+                    .module(match.moduleName())
+                    .packageName(match.packageName())
+                    .symbol(match.typeName())
+                    .version(match.version())
+                    .build();
+            importedTypesBuilder.stepIn(match.moduleName(), "", List.of())
+                    .node(new AvailableNode(metadata, codedata, true));
+            remainingLimit--;
+        }
     }
 
     /**
-     * Mutable offset/limit window shared across every module processed in a single {@link #buildLiveDependencyTypes()}
-     * call, so live fallback results are paged as one combined window rather than per module.
+     * A type match found via live compilation, carrying enough context to build its {@link AvailableNode}
+     * once matches from every missing module have been collected and ranked together.
+     *
+     * @param moduleName  the module key ("packageName[.moduleNamePart]") the type was found in
+     * @param orgName     the org of the dependency package
+     * @param packageName the name of the dependency package
+     * @param version     the version of the dependency package
+     * @param typeName    the name of the matched type
+     * @param description the description of the matched type
+     * @param score       the relevance score for ranking
      */
-    private static final class PaginationWindow {
-        private int remainingToSkip;
-        private int remainingLimit;
-
-        private PaginationWindow(int offset, int limit) {
-            this.remainingToSkip = offset;
-            this.remainingLimit = limit;
-        }
+    private record LiveTypeMatch(String moduleName, String orgName, String packageName, String version,
+                                  String typeName, String description, int score) {
     }
 
-    private void buildLiveModuleTypes(Module module, String moduleName, Package dependencyPackage,
-                                       Category.Builder importedTypesBuilder, PaginationWindow window) {
-        if (window.remainingLimit <= 0) {
-            return;
-        }
+    private List<LiveTypeMatch> collectLiveModuleTypes(Module module, String moduleName, Package dependencyPackage) {
         SemanticModel semanticModel;
         try {
             semanticModel = PackageUtil.getCompilation(module.packageInstance()).getSemanticModel(module.moduleId());
         } catch (RuntimeException e) {
-            return; // no semantic model for generated/testonly modules
+            return List.of(); // no semantic model for generated/testonly modules
         }
         if (semanticModel == null) {
-            return;
+            return List.of();
         }
 
         String orgName = dependencyPackage.packageOrg().toString();
         String packageName = dependencyPackage.packageName().toString();
         String version = dependencyPackage.packageVersion().toString();
 
-        List<ScoredType> scoredTypes = new ArrayList<>();
+        List<LiveTypeMatch> matches = new ArrayList<>();
         for (Symbol symbol : semanticModel.moduleSymbols()) {
             if (!(symbol instanceof TypeDefinitionSymbol) && !(symbol instanceof ClassSymbol)) {
                 continue;
@@ -264,38 +327,11 @@ class TypeSearchCommand extends SearchCommand {
             }
             int score = RelevanceCalculator.calculateFuzzyRelevanceScore(typeName, description, query);
             if (score > 0) {
-                scoredTypes.add(new ScoredType(symbol, typeName, description, score));
+                matches.add(new LiveTypeMatch(moduleName, orgName, packageName, version, typeName, description,
+                        score));
             }
         }
-        scoredTypes.sort(Comparator.comparingInt(ScoredType::score).reversed()
-                .thenComparing(ScoredType::typeName));
-
-        String icon = CommonUtils.generateIcon(orgName, packageName, version);
-        for (ScoredType scoredType : scoredTypes) {
-            if (window.remainingToSkip > 0) {
-                window.remainingToSkip--;
-                continue;
-            }
-            if (window.remainingLimit <= 0) {
-                break;
-            }
-            Metadata metadata = new Metadata.Builder<>(null)
-                    .label(scoredType.typeName())
-                    .description(scoredType.description())
-                    .icon(icon)
-                    .build();
-            Codedata codedata = new Codedata.Builder<>(null)
-                    .node(NodeKind.TYPEDESC)
-                    .org(orgName)
-                    .module(moduleName)
-                    .packageName(packageName)
-                    .symbol(scoredType.typeName())
-                    .version(version)
-                    .build();
-            importedTypesBuilder.stepIn(moduleName, "", List.of())
-                    .node(new AvailableNode(metadata, codedata, true));
-            window.remainingLimit--;
-        }
+        return matches;
     }
 
     @Override

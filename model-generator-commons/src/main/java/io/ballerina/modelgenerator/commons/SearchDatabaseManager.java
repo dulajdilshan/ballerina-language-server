@@ -582,6 +582,12 @@ public class SearchDatabaseManager {
         List<String> distinctPackageNames = List.copyOf(new LinkedHashSet<>(packageNames));
         List<SearchResult> results = new ArrayList<>();
 
+        // limit/offset come straight from the client query map with no bounds checking, so clamp to non-negative
+        // and guard the window-end sum against overflow (e.g. a client passing limit=Integer.MAX_VALUE).
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.max(limit, 0);
+        int windowEnd = (int) Math.min((long) safeOffset + safeLimit, Integer.MAX_VALUE);
+
         String packagePlaceholders = String.join(",", Collections.nCopies(distinctPackageNames.size(), "?"));
         String rangeValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?,?)"));
 
@@ -590,19 +596,19 @@ public class SearchDatabaseManager {
                 + "  SELECT t.name AS type_name, t.description AS type_description, t.package_id, "
                 + "         p.name AS module_name, p.package_name, p.org AS package_org, "
                 + "         p.version AS package_version, q.pkg_skip AS pkg_skip, q.pkg_take AS pkg_take, "
-                + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name) AS rn "
+                + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name, p.id, t.id) AS rn "
                 + "  FROM Package p "
                 + "  JOIN Type t ON p.id = t.package_id "
                 + "  JOIN (SELECT column1 AS pkg_name, column2 AS pkg_skip, column3 AS pkg_take "
                 + "        FROM (VALUES " + rangeValuesClause + ")) AS q ON q.pkg_name = p.name "
                 + "  WHERE p.name IN (" + packagePlaceholders + ")"
                 + ") WHERE rn > pkg_skip AND rn <= pkg_skip + pkg_take "
-                + "ORDER BY module_name, type_name";
+                + "ORDER BY module_name, type_name, package_id";
 
         try (Connection conn = DriverManager.getConnection(dbPath)) {
             Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, distinctPackageNames);
-            Map<String, Integer> startQuotas = computeFairShareQuotas(counts, offset);
-            Map<String, Integer> endQuotas = computeFairShareQuotas(counts, offset + limit);
+            Map<String, Integer> startQuotas = computeFairShareQuotas(counts, safeOffset);
+            Map<String, Integer> endQuotas = computeFairShareQuotas(counts, windowEnd);
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 int paramIndex = 1;
@@ -696,33 +702,37 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Returns which of the given module names are indexed, i.e. present in the {@code Package} table - regardless
-     * of whether they happen to have any {@code Type} rows. A module can be legitimately indexed with zero types
-     * (e.g. {@code ballerina/lang.float}); such a module must still count as indexed here, otherwise it's
-     * misreported as missing and forces a full live compilation on every request. Unpaginated, unlike
-     * {@link #searchTypesByPackages}, so a module isn't misreported as missing just because paging cut it off.
+     * Returns which of the given module names are indexed, i.e. present in the {@code Package} table under the
+     * matching org - regardless of whether they happen to have any {@code Type} rows. A module can be legitimately
+     * indexed with zero types (e.g. {@code ballerina/lang.float}); such a module must still count as indexed here,
+     * otherwise it's misreported as missing and forces a full live compilation on every request. Unpaginated,
+     * unlike {@link #searchTypesByPackages}, so a module isn't misreported as missing just because paging cut it
+     * off. Matching includes org (not name alone) since {@code Package.name} has no uniqueness constraint and two
+     * different orgs can publish a same-named package.
      *
-     * @param packageNames List of module names to check
-     * @return The subset of {@code packageNames} present in the index
+     * @param moduleNameToOrg Map of module name (key format matches the {@code Package.name} column, including any
+     *                        submodule part) to the org that resolved it
+     * @return The subset of {@code moduleNameToOrg} keys present in the index under their given org
      * @throws RuntimeException if there is an error executing the query
      */
-    public Set<String> findIndexedModuleNames(List<String> packageNames) {
-        if (packageNames.isEmpty()) {
+    public Set<String> findIndexedModuleNames(Map<String, String> moduleNameToOrg) {
+        if (moduleNameToOrg.isEmpty()) {
             return Collections.emptySet();
         }
         Set<String> indexedModuleNames = new HashSet<>();
 
-        String sql = "SELECT DISTINCT p.name AS module_name FROM Package p " +
-                "WHERE p.name IN (" +
-                String.join(",", Collections.nCopies(packageNames.size(), "?")) +
-                ")";
+        String valuesClause = String.join(",", Collections.nCopies(moduleNameToOrg.size(), "(?,?)"));
+        String sql = "SELECT DISTINCT p.name AS module_name FROM Package p "
+                + "JOIN (SELECT column1 AS q_org, column2 AS q_name FROM (VALUES " + valuesClause + ")) AS q "
+                + "ON p.org = q_org AND p.name = q_name";
 
         try (Connection conn = DriverManager.getConnection(dbPath);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             int paramIndex = 1;
-            for (String packageName : packageNames) {
-                stmt.setString(paramIndex++, packageName);
+            for (Map.Entry<String, String> entry : moduleNameToOrg.entrySet()) {
+                stmt.setString(paramIndex++, entry.getValue());
+                stmt.setString(paramIndex++, entry.getKey());
             }
 
             try (ResultSet rs = stmt.executeQuery()) {
