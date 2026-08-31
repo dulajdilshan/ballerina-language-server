@@ -65,6 +65,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Represents a command to search for types within a module. This class extends SearchCommand and provides functionality
@@ -87,7 +89,8 @@ import java.util.TreeSet;
  */
 class TypeSearchCommand extends SearchCommand {
 
-    private final List<String> moduleNames;
+    private static final Logger LOGGER = Logger.getLogger(TypeSearchCommand.class.getName());
+
     private final Set<String> moduleNameSet;
     private final Map<String, String> moduleOrgByName;
 
@@ -113,8 +116,7 @@ class TypeSearchCommand extends SearchCommand {
                 orgByModuleName.put(moduleKey, moduleDependency.descriptor().org().value());
             }
         }
-        moduleNames = List.copyOf(importedModuleNames);
-        moduleNameSet = importedModuleNames; // fast membership checks in buildLibraryNodes
+        moduleNameSet = Set.copyOf(importedModuleNames);
         moduleOrgByName = Map.copyOf(orgByModuleName);
     }
 
@@ -133,7 +135,7 @@ class TypeSearchCommand extends SearchCommand {
      * {@link #buildWorkspaceNodes()}, so treating them as "imported" here would emit their types twice.
      */
     private static boolean isWorkspaceMember(Project project, Package currentPackage,
-                                              ModuleDependency moduleDependency) {
+                                             ModuleDependency moduleDependency) {
         if (isSamePackage(currentPackage, moduleDependency)) {
             return true;
         }
@@ -153,8 +155,8 @@ class TypeSearchCommand extends SearchCommand {
     protected List<Item> defaultView() {
         buildWorkspaceNodes();
         List<SearchResult> searchResults = new ArrayList<>();
-        if (!moduleNames.isEmpty()) {
-            searchResults.addAll(dbManager.searchTypesByPackages(moduleNames, limit, offset));
+        if (!moduleNameSet.isEmpty()) {
+            searchResults.addAll(dbManager.searchTypesByPackages(moduleOrgByName, limit, offset));
         }
 
         int importedCount = buildLibraryNodes(searchResults);
@@ -192,7 +194,7 @@ class TypeSearchCommand extends SearchCommand {
      * @param consumedFromIndexed how many {@code IMPORTED_TYPES} slots the indexed results already filled this page
      */
     private void buildLiveDependencyTypes(int consumedFromIndexed) {
-        if (moduleNames.isEmpty()) {
+        if (moduleNameSet.isEmpty()) {
             return;
         }
 
@@ -205,7 +207,7 @@ class TypeSearchCommand extends SearchCommand {
         Set<String> indexedModuleNames = dbManager.findIndexedModuleNames(moduleOrgByName);
 
         Set<String> missingModuleNames = new HashSet<>();
-        for (String moduleName : moduleNames) {
+        for (String moduleName : moduleNameSet) {
             if (!indexedModuleNames.contains(moduleName)) {
                 missingModuleNames.add(moduleName);
             }
@@ -290,7 +292,7 @@ class TypeSearchCommand extends SearchCommand {
      * @param score       the relevance score for ranking
      */
     private record LiveTypeMatch(String moduleName, String orgName, String packageName, String version,
-                                  String typeName, String description, int score) {
+                                 String typeName, String description, int score) {
     }
 
     private List<LiveTypeMatch> collectLiveModuleTypes(Module module, String moduleName, Package dependencyPackage) {
@@ -298,7 +300,10 @@ class TypeSearchCommand extends SearchCommand {
         try {
             semanticModel = PackageUtil.getCompilation(module.packageInstance()).getSemanticModel(module.moduleId());
         } catch (RuntimeException e) {
-            return List.of(); // no semantic model for generated/testonly modules
+            // Expected for generated/testonly modules with no semantic model, but also catches genuine compiler
+            // errors, so log a breadcrumb rather than failing completely silently.
+            LOGGER.log(Level.FINE, "Failed to compile dependency module for live type search: " + moduleName, e);
+            return List.of();
         }
         if (semanticModel == null) {
             return List.of();

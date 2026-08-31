@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -486,6 +485,10 @@ public class SearchDatabaseManager {
     public List<SearchResult> searchTypes(String q, int limit, int offset) {
         List<SearchResult> results = new ArrayList<>();
         String sanitizedQuery = sanitizeQuery(q);
+        // limit/offset come straight from the client query map with no bounds checking, and SQLite treats a
+        // negative LIMIT as unlimited, so clamp both to non-negative.
+        int safeLimit = Math.max(limit, 0);
+        int safeOffset = Math.max(offset, 0);
         String sql;
         if (sanitizedQuery.isEmpty()) {
             sql = """
@@ -530,12 +533,12 @@ public class SearchDatabaseManager {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             if (sanitizedQuery.isEmpty()) {
-                stmt.setInt(1, limit);
-                stmt.setInt(2, offset);
+                stmt.setInt(1, safeLimit);
+                stmt.setInt(2, safeOffset);
             } else {
                 stmt.setString(1, sanitizedQuery + "*");
-                stmt.setInt(2, limit);
-                stmt.setInt(3, offset);
+                stmt.setInt(2, safeLimit);
+                stmt.setInt(3, safeOffset);
             }
 
             try (ResultSet rs = stmt.executeQuery()) {
@@ -563,23 +566,26 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Searches for types that match the given package names, using a water-filling fair-share allocation per
-     * package so one large package can't crowd out the others. Each package's row range is derived from the
+     * Searches for types that match the given module names, using a water-filling fair-share allocation per
+     * module so one large module can't crowd out the others. Each module's row range is derived from the
      * quota at {@code offset} (its skip) and at {@code offset + limit} (its skip + take), rather than a single
      * global {@code LIMIT}/{@code OFFSET} over a window-wide cap, so consecutive pages don't duplicate or skip
-     * rows when a later page's larger window shifts the per-package caps.
+     * rows when a later page's larger window shifts the per-module caps. Matching includes org (not name alone)
+     * since {@code Package.name} has no uniqueness constraint and two different orgs can publish a same-named
+     * package.
      *
-     * @param packageNames List of package names to search in
-     * @param limit        The maximum number of results to return
-     * @param offset       The number of results to skip
+     * @param moduleNameToOrg Map of module name (key format matches the {@code Package.name} column, including
+     *                        any submodule part) to the org that resolved it
+     * @param limit           The maximum number of results to return
+     * @param offset          The number of results to skip
      * @return A list of search results matching the criteria
      * @throws RuntimeException if there is an error executing the search or if the limit or offset values are invalid
      */
-    public List<SearchResult> searchTypesByPackages(List<String> packageNames, int limit, int offset) {
-        if (packageNames.isEmpty()) {
+    public List<SearchResult> searchTypesByPackages(Map<String, String> moduleNameToOrg, int limit, int offset) {
+        if (moduleNameToOrg.isEmpty()) {
             return Collections.emptyList();
         }
-        List<String> distinctPackageNames = List.copyOf(new LinkedHashSet<>(packageNames));
+        List<String> moduleNames = List.copyOf(moduleNameToOrg.keySet());
         List<SearchResult> results = new ArrayList<>();
 
         // limit/offset come straight from the client query map with no bounds checking, so clamp to non-negative
@@ -588,8 +594,7 @@ public class SearchDatabaseManager {
         int safeLimit = Math.max(limit, 0);
         int windowEnd = (int) Math.min((long) safeOffset + safeLimit, Integer.MAX_VALUE);
 
-        String packagePlaceholders = String.join(",", Collections.nCopies(distinctPackageNames.size(), "?"));
-        String rangeValuesClause = String.join(",", Collections.nCopies(distinctPackageNames.size(), "(?,?,?)"));
+        String rangeValuesClause = String.join(",", Collections.nCopies(moduleNames.size(), "(?,?,?,?)"));
 
         String sql = "SELECT type_name, type_description, package_id, module_name, package_name, "
                 + "package_org, package_version FROM ("
@@ -599,28 +604,26 @@ public class SearchDatabaseManager {
                 + "         ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY t.name, p.id, t.id) AS rn "
                 + "  FROM Package p "
                 + "  JOIN Type t ON p.id = t.package_id "
-                + "  JOIN (SELECT column1 AS pkg_name, column2 AS pkg_skip, column3 AS pkg_take "
-                + "        FROM (VALUES " + rangeValuesClause + ")) AS q ON q.pkg_name = p.name "
-                + "  WHERE p.name IN (" + packagePlaceholders + ")"
+                + "  JOIN (SELECT column1 AS pkg_org, column2 AS pkg_name, column3 AS pkg_skip, "
+                + "               column4 AS pkg_take FROM (VALUES " + rangeValuesClause + ")) AS q "
+                + "  ON q.pkg_org = p.org AND q.pkg_name = p.name"
                 + ") WHERE rn > pkg_skip AND rn <= pkg_skip + pkg_take "
                 + "ORDER BY module_name, type_name, package_id";
 
         try (Connection conn = DriverManager.getConnection(dbPath)) {
-            Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, distinctPackageNames);
+            Map<String, Integer> counts = fetchPerPackageTypeCounts(conn, moduleNameToOrg);
             Map<String, Integer> startQuotas = computeFairShareQuotas(counts, safeOffset);
             Map<String, Integer> endQuotas = computeFairShareQuotas(counts, windowEnd);
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 int paramIndex = 1;
-                for (String packageName : distinctPackageNames) {
-                    int skip = startQuotas.getOrDefault(packageName, 0);
-                    int take = endQuotas.getOrDefault(packageName, 0) - skip;
-                    stmt.setString(paramIndex++, packageName);
+                for (String moduleName : moduleNames) {
+                    int skip = startQuotas.getOrDefault(moduleName, 0);
+                    int take = endQuotas.getOrDefault(moduleName, 0) - skip;
+                    stmt.setString(paramIndex++, moduleNameToOrg.get(moduleName));
+                    stmt.setString(paramIndex++, moduleName);
                     stmt.setInt(paramIndex++, skip);
                     stmt.setInt(paramIndex++, take);
-                }
-                for (String packageName : distinctPackageNames) {
-                    stmt.setString(paramIndex++, packageName);
                 }
 
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -670,25 +673,28 @@ public class SearchDatabaseManager {
     }
 
     /**
-     * Returns the number of indexed types available per package name, with {@code 0} for names with no rows.
+     * Returns the number of indexed types available per module name, with {@code 0} for names with no rows.
+     * Matching includes org (not name alone), same as {@link #searchTypesByPackages}.
      */
-    private Map<String, Integer> fetchPerPackageTypeCounts(Connection conn, List<String> packageNames)
+    private Map<String, Integer> fetchPerPackageTypeCounts(Connection conn, Map<String, String> moduleNameToOrg)
             throws SQLException {
         Map<String, Integer> counts = new HashMap<>();
-        for (String packageName : packageNames) {
-            counts.put(packageName, 0);
+        for (String moduleName : moduleNameToOrg.keySet()) {
+            counts.put(moduleName, 0);
         }
 
-        String packagePlaceholders = String.join(",", Collections.nCopies(packageNames.size(), "?"));
+        String valuesClause = String.join(",", Collections.nCopies(moduleNameToOrg.size(), "(?,?)"));
         String sql = "SELECT p.name AS module_name, COUNT(*) AS type_count FROM Package p "
                 + "JOIN Type t ON p.id = t.package_id "
-                + "WHERE p.name IN (" + packagePlaceholders + ") "
+                + "JOIN (SELECT column1 AS q_org, column2 AS q_name FROM (VALUES " + valuesClause + ")) AS q "
+                + "ON p.org = q.q_org AND p.name = q.q_name "
                 + "GROUP BY p.name";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             int paramIndex = 1;
-            for (String packageName : packageNames) {
-                stmt.setString(paramIndex++, packageName);
+            for (Map.Entry<String, String> entry : moduleNameToOrg.entrySet()) {
+                stmt.setString(paramIndex++, entry.getValue());
+                stmt.setString(paramIndex++, entry.getKey());
             }
 
             try (ResultSet rs = stmt.executeQuery()) {

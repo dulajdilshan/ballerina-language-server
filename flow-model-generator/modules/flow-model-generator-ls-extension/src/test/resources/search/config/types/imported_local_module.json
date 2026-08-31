@@ -1,5 +1,5 @@
 {
-  "description": "Sample flow model",
+  "description": "Type search default view combining indexed dependency types with types from a generated local module (Weather) via buildImportedLocalModules",
   "kind": "TYPE",
   "source": "proj2/automation.bal",
   "queryMap": {
