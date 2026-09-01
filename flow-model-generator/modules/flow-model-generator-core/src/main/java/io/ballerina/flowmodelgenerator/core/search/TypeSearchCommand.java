@@ -155,12 +155,17 @@ class TypeSearchCommand extends SearchCommand {
     protected List<Item> defaultView() {
         buildWorkspaceNodes();
         List<SearchResult> searchResults = new ArrayList<>();
+        int indexedCapacity = 0;
         if (!moduleNameSet.isEmpty()) {
             searchResults.addAll(dbManager.searchTypesByPackages(moduleOrgByName, limit, offset));
+            indexedCapacity = dbManager.countIndexedTypes(moduleOrgByName);
         }
 
         int importedCount = buildLibraryNodes(searchResults);
-        buildLiveDependencyTypes(importedCount);
+        // The fair-share indexed pool has a fixed capacity that can be exhausted well before offset catches up
+        // (unlike search()'s global FTS query below, whose window keeps growing with the whole library), so only
+        // the portion of offset beyond that capacity should be skipped from the live-compiled fallback pool.
+        buildLiveDependencyTypes(importedCount, Math.max(0, offset - indexedCapacity));
         buildImportedLocalModules();
         return rootBuilder.build().items();
     }
@@ -170,7 +175,7 @@ class TypeSearchCommand extends SearchCommand {
         buildWorkspaceNodes();
         List<SearchResult> typeSearchList = dbManager.searchTypes(query, limit, offset);
         int importedCount = buildLibraryNodes(typeSearchList);
-        buildLiveDependencyTypes(importedCount);
+        buildLiveDependencyTypes(importedCount, offset);
         buildImportedLocalModules();
         return rootBuilder.build().items();
     }
@@ -192,8 +197,11 @@ class TypeSearchCommand extends SearchCommand {
      * weaker matches from a module visited earlier.
      *
      * @param consumedFromIndexed how many {@code IMPORTED_TYPES} slots the indexed results already filled this page
+     * @param liveSkip            how many matches to skip within the live-compiled pool before taking results,
+     *                            i.e. the portion of the page's offset not already accounted for by the indexed
+     *                            pool
      */
-    private void buildLiveDependencyTypes(int consumedFromIndexed) {
+    private void buildLiveDependencyTypes(int consumedFromIndexed, int liveSkip) {
         if (moduleNameSet.isEmpty()) {
             return;
         }
@@ -250,7 +258,7 @@ class TypeSearchCommand extends SearchCommand {
                 .thenComparing(LiveTypeMatch::typeName));
 
         Category.Builder importedTypesBuilder = rootBuilder.stepIn(Category.Name.IMPORTED_TYPES);
-        int remainingToSkip = offset;
+        int remainingToSkip = liveSkip;
         for (LiveTypeMatch match : allMatches) {
             if (remainingToSkip > 0) {
                 remainingToSkip--;
@@ -507,8 +515,11 @@ class TypeSearchCommand extends SearchCommand {
                     .symbol(searchResult.name())
                     .version(packageInfo.version())
                     .build();
+            // Org-aware: search() sources typeSearchList from a global FTS query with no org filtering, so a
+            // same-named package from a different org (e.g. ballerina/copybook vs ballerinax/copybook) must not
+            // be misclassified as imported just because the name matches.
             Category.Builder builder;
-            if (moduleNameSet.contains(packageInfo.moduleName())) {
+            if (packageInfo.org().equals(moduleOrgByName.get(packageInfo.moduleName()))) {
                 builder = importedTypesBuilder;
                 importedCount++;
             } else {

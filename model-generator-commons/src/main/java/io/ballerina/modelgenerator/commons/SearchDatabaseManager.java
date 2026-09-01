@@ -708,6 +708,31 @@ public class SearchDatabaseManager {
     }
 
     /**
+     * Returns the total number of indexed type rows across the given modules, i.e. the full capacity of the
+     * fair-share pool {@link #searchTypesByPackages} pages over. Callers that also fall back to live compilation
+     * for modules missing from the index use this to work out how much of a combined pagination window the
+     * indexed pool has already accounted for, independent of how any single page's fair-share quota split out.
+     *
+     * @param moduleNameToOrg Map of module name (key format matches the {@code Package.name} column, including any
+     *                        submodule part) to the org that resolved it
+     * @return The sum of indexed type counts across {@code moduleNameToOrg}
+     * @throws RuntimeException if there is an error executing the query
+     */
+    public int countIndexedTypes(Map<String, String> moduleNameToOrg) {
+        if (moduleNameToOrg.isEmpty()) {
+            return 0;
+        }
+        try (Connection conn = DriverManager.getConnection(dbPath)) {
+            return fetchPerPackageTypeCounts(conn, moduleNameToOrg).values().stream()
+                    .mapToInt(Integer::intValue)
+                    .sum();
+        } catch (SQLException e) {
+            LOGGER.severe("Error counting indexed types: " + e.getMessage());
+            throw new RuntimeException("Failed to count indexed types", e);
+        }
+    }
+
+    /**
      * Returns which of the given module names are indexed, i.e. present in the {@code Package} table under the
      * matching org - regardless of whether they happen to have any {@code Type} rows. A module can be legitimately
      * indexed with zero types (e.g. {@code ballerina/lang.float}); such a module must still count as indexed here,

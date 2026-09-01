@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com)
+ *  Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
  *
  *  WSO2 LLC. licenses this file to you under the Apache License,
  *  Version 2.0 (the "License"); you may not use this file except
@@ -111,5 +111,20 @@ public class SearchDatabaseManagerOrgMatchTest {
             Assert.assertEquals(result.packageInfo().moduleName(), "os");
             Assert.assertEquals(result.packageInfo().org(), "ballerina");
         }
+    }
+
+    @Test(description = "countIndexedTypes must sum real per-module counts and ignore modules absent from the "
+            + "index, matching the capacity TypeSearchCommand relies on to offset its live-fallback pagination")
+    public void testCountIndexedTypesSumsAcrossModules() {
+        // ballerinax/copybook=3, ballerina/np=3, ballerina/os=5 -> 11 total; a module with no index rows at all
+        // contributes 0 rather than throwing or being skipped.
+        int total = dbManager.countIndexedTypes(Map.of(
+                "copybook", "ballerinax",
+                "np", "ballerina",
+                "os", "ballerina",
+                "totally-fake-module-xyz", "totally-fake-org-xyz"));
+        Assert.assertEquals(total, 11);
+
+        Assert.assertEquals(dbManager.countIndexedTypes(Map.of()), 0);
     }
 }
